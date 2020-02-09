@@ -1,0 +1,5 @@
+menuconfig BR2_PACKAGE_OPENNOS_MGMT
+        bool "Open NOS management"
+        default y
+        help
+          Open NOS management.

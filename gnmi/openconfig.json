@@ -1,0 +1,40 @@
+{
+  "openconfig-interfaces:interfaces": {
+    "interface": [
+      {
+        "name": "admin",
+        "config": {
+          "name": "admin",
+          "mtu": 1514
+        }
+      },
+      {
+        "name": "eth-1",
+        "config": {
+          "description": "QSFP28 No. 1 port with breakout mode speed capability",
+          "mtu": 9412
+        },
+        "state": {
+          "admin-status": "UP"
+        },
+        "openconfig-if-ethernet:ethernet": {
+          "openconfig-vlan:switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                300,
+                200,
+                "500..505"
+             ]
+            }
+          },
+          "config": {
+            "port-speed": "SPEED_100GB"
+          }
+        }
+      }
+    ]
+  }
+}
