@@ -18,7 +18,6 @@ package gnmi
 import (
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"sort"
 
@@ -64,19 +63,15 @@ func (m *Model) NewConfigStruct(jsonConfig []byte) (ygot.ValidatedGoStruct, erro
 		return nil, fmt.Errorf("cannot create root node: %v", stat)
 	}
 
-	log.Printf("DBG: %+v", rootNode)
 	rootStruct, ok := rootNode.(ygot.ValidatedGoStruct)
 	if !ok {
 		return nil, errors.New("root node is not a ygot.ValidatedGoStruct")
 	}
-	log.Printf("DBG: %+v", rootStruct)
 	if jsonConfig != nil {
 		if err := m.jsonUnmarshaler(jsonConfig, rootStruct); err != nil {
-			log.Printf("DBG: Failed unmarshaler")
 			return nil, err
 		}
 		if err := rootStruct.Validate(); err != nil {
-			log.Printf("DBG: Failed on validate")
 			return nil, err
 		}
 	}

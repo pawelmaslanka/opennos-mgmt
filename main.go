@@ -22,6 +22,7 @@ import (
 	"opennos-mgmt/gnmi/modeldata"
 	"opennos-mgmt/gnmi/modeldata/oc"
 
+	vlan "opennos-mgmt/management/vlan"
 	"opennos-mgmt/utils/credentials"
 
 	pb "github.com/openconfig/gnmi/proto/gnmi"
@@ -272,6 +273,10 @@ func main() {
 			c.SetPrompt(fmt.Sprintf("[edit interface %s]# ", c.Args[0]))
 			// editableIfaces[c.Args[2]] = NewIface()
 			// vlans = append(vlans, c.Args...)
+			if err := vlan.SetNativeVlan(c.Args[0], 2); err != nil {
+				c.Err(errors.New("Failed to set native VLAN"))
+				return
+			}
 		},
 	}
 
