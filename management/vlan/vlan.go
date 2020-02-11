@@ -59,6 +59,12 @@ func Close() error {
 }
 
 func SetNativeVlan(ifname string, vid uint32) error {
+	var err error
+	if err = Connect(); err != nil {
+		log.Fatalf("Faield to connect gRPC service server: %v", err)
+		return err
+	}
+	defer Close()
 	log.Printf("Set native VLAN %d on interface %s", vid, ifname)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()

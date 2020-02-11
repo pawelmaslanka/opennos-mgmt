@@ -17,3 +17,4 @@ gnmi/certs/*.crt
 gnmi/certs/*.csr
 gnmi/certs/*.key
 gnmi/certs/*.srl
+opennos-mgmt
