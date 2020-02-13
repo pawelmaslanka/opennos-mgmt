@@ -273,7 +273,9 @@ func main() {
 			c.SetPrompt(fmt.Sprintf("[edit interface %s]# ", c.Args[0]))
 			// editableIfaces[c.Args[2]] = NewIface()
 			// vlans = append(vlans, c.Args...)
-			if err := vlan.SetNativeVlan(c.Args[0], 2); err != nil {
+			port := make([]string, 1)
+			port[0] = c.Args[0]
+			if err := vlan.SetNativeVlan(port, 2); err != nil {
 				c.Err(errors.New("Failed to set native VLAN"))
 				return
 			}

@@ -29,7 +29,7 @@ import (
 )
 
 const (
-	address = "localhost:50056"
+	kAddress = "localhost:50056"
 )
 
 type EthSwitchVlanMgmt struct {
@@ -39,9 +39,9 @@ type EthSwitchVlanMgmt struct {
 
 var gCtx EthSwitchVlanMgmt
 
-func Connect() error {
+func ConnectWithGrpcService() error {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+	conn, err := grpc.Dial(kAddress, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("Failed to dial into gRPC server: %v", err)
 		return err
@@ -53,24 +53,34 @@ func Connect() error {
 	return nil
 }
 
-func Close() error {
+func CloseConnWithGrpcService() error {
 	gCtx.clientConn.Close()
 	return nil
 }
 
-func SetNativeVlan(ifname string, vid uint32) error {
-	var err error
-	if err = Connect(); err != nil {
-		log.Fatalf("Faield to connect gRPC service server: %v", err)
+// SetNativeVlan sets native VLAN on given interfaces. Interface can be given 
+// as physial front panel port or logical LAG interface. This function is responsible 
+// for parse LAG interface and pass its port members.
+func SetNativeVlan(ifnames []string, vid uint16) error {
+	ports := make([]*pb.Port, len(ifnames))
+	for i := 0; i < len(ifnames); i++ {
+		// TODO: Extract LAG members
+		// if strings.Contains(ifname, "ae") {
+		// }
+		ports[i] = &pb.Port{ Name: ifnames[i] }
+	}
+
+	if err := ConnectWithGrpcService(); err != nil {
+		log.Fatalf("Failed to connect with VLAN management gRPC service server: %v", err)
 		return err
 	}
-	defer Close()
-	log.Printf("Set native VLAN %d on interface %s", vid, ifname)
+	defer CloseConnWithGrpcService()
+	log.Printf("Set native VLAN %d on %d ports", vid, len(ifnames))
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	r, err := gCtx.vlanMgmtClient.SetNativeVlan(ctx, &pb.NativeVlan{
-		Interface: &pb.Interface{Ifname: ifname},
-		Vid:       vid,
+		Ports: ports,
+		Vid:   uint32(vid),
 	})
 
 	if err != nil {

@@ -8,11 +8,12 @@ OPENNOS_MGMT_SITE = $(BR2_EXTERNAL_DESTINY_PATH)/package/opennos-mgmt
 OPENNOS_MGMT_SITE_METHOD = local
 OPENNOS_MGMT_LICENSE = Apache-2.0
 # OPENNOS_MGMT_LICENSE_FILES = LICENSE
-# OPENNOS_MGMT_DEPENDENCIES = host-go go-opennsl
+OPENNOS_MGMT_DEPENDENCIES = bcm-eth-switch-mgmt
 
 define OPENNOS_MGMT_POST_RSYNC_HOOK
 	# GOPATH=$(@D)/_gopath ${GO_BIN} get -u github.com/sirupsen/logrus
 	mkdir -p $(@D)/_gopath/{bin,pkg,src}
+	cp -Rf $(BCM_ETH_SWITCH_MGMT_DIR)/_gopath/src/* $(@D)/_gopath/src
 	GOPATH=$(@D)/_gopath ${GO_BIN} get -u github.com/openconfig/gnmi/cmd/gnmi_cli
 	mkdir -p $(@D)/_gopath/src/github.com/google/
 	(cd $(@D)/_gopath/src/github.com/google/ && git clone https://github.com/google/gnxi.git)
@@ -28,6 +29,7 @@ define OPENNOS_MGMT_POST_RSYNC_HOOK
 	GOPATH=$(@D)/_gopath ${GO_BIN} get -u github.com/abiosoft/ishell
 	mkdir -p $(@D)/_gopath/src/opennos-mgmt
 	mv $(@D)/main.go $(@D)/_gopath/src/opennos-mgmt
+	mv $(@D)/management $(@D)/_gopath/src/opennos-mgmt
 	mv $(@D)/gnmi $(@D)/_gopath/src/opennos-mgmt
 	mv $(@D)/utils $(@D)/_gopath/src/opennos-mgmt
 endef
