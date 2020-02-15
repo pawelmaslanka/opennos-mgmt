@@ -15,6 +15,8 @@ define OPENNOS_MGMT_POST_RSYNC_HOOK
 	mkdir -p $(@D)/_gopath/{bin,pkg,src}
 	cp -Rf $(BCM_ETH_SWITCH_MGMT_DIR)/_gopath/src/* $(@D)/_gopath/src
 	GOPATH=$(@D)/_gopath ${GO_BIN} get -u github.com/openconfig/gnmi/cmd/gnmi_cli
+	GOPATH=$(@D)/_gopath ${GO_BIN} get -u github.com/jinzhu/copier
+	GOPATH=$(@D)/_gopath ${GO_BIN} get -u github.com/r3labs/diff
 	mkdir -p $(@D)/_gopath/src/github.com/google/
 	(cd $(@D)/_gopath/src/github.com/google/ && git clone https://github.com/google/gnxi.git)
 	(cd $(@D)/_gopath/src/github.com/google/gnxi/gnmi_get; \

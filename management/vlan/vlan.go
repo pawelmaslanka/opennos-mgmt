@@ -39,7 +39,7 @@ type EthSwitchVlanMgmt struct {
 
 var gCtx EthSwitchVlanMgmt
 
-func ConnectWithGrpcService() error {
+func ConnectToGrpcService() error {
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(kAddress, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
@@ -58,8 +58,8 @@ func CloseConnWithGrpcService() error {
 	return nil
 }
 
-// SetNativeVlan sets native VLAN on given interfaces. Interface can be given 
-// as physial front panel port or logical LAG interface. This function is responsible 
+// SetNativeVlan sets native VLAN on given interfaces. Interface can be given
+// as physial front panel port or logical LAG interface. This function is responsible
 // for parse LAG interface and pass its port members.
 func SetNativeVlan(ifnames []string, vid uint16) error {
 	ports := make([]*pb.Port, len(ifnames))
@@ -67,10 +67,10 @@ func SetNativeVlan(ifnames []string, vid uint16) error {
 		// TODO: Extract LAG members
 		// if strings.Contains(ifname, "ae") {
 		// }
-		ports[i] = &pb.Port{ Name: ifnames[i] }
+		ports[i] = &pb.Port{Name: ifnames[i]}
 	}
 
-	if err := ConnectWithGrpcService(); err != nil {
+	if err := ConnectToGrpcService(); err != nil {
 		log.Fatalf("Failed to connect with VLAN management gRPC service server: %v", err)
 		return err
 	}

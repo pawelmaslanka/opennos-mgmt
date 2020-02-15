@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,9 +10,12 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/abiosoft/ishell"
 	log "github.com/golang/glog"
+	"github.com/jinzhu/copier"
+	"github.com/r3labs/diff"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -26,6 +30,7 @@ import (
 	"opennos-mgmt/utils/credentials"
 
 	pb "github.com/openconfig/gnmi/proto/gnmi"
+	"github.com/openconfig/ygot/ygot"
 )
 
 var validIfaces = [...]string{
@@ -94,8 +99,52 @@ type server struct {
 	*gnmi.Server
 }
 
+var gCurrentConfig ygot.ValidatedGoStruct
+var doOnce sync.Once
+
+var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct) error {
+	doOnce.Do(func() {
+		copier.Copy(&gCurrentConfig, &newConfig)
+	})
+
+	changelog, err := diff.Diff(gCurrentConfig, newConfig)
+	if err != nil {
+		log.Errorf("Failed to get diff of two config objects: %s", err)
+		return err
+	}
+
+	log.Infof("Changlog (%d):\n%#v\n", len(changelog), changelog)
+	jsonDump, err := json.MarshalIndent(changelog, "", "    ")
+	if err != nil {
+		log.Errorf("Failed to JSON dump: %s", err)
+	}
+
+	log.Infof("Dump JSON: %s", string(jsonDump))
+	if len(changelog) > 0 {
+		log.Infof("Configuration has been changed")
+		for _, changedItem := range changelog {
+			if "NativeVlan" == changedItem.Path[4] {
+				port := make([]string, 1)
+				port[0] = changedItem.Path[1]
+				if err := vlan.SetNativeVlan(port, changedItem.To.(uint16)); err != nil {
+					log.Errorf("Failed to set native VLAN")
+					return err
+				}
+
+				log.Infof("Native VLAN has been changed to %d on port %s",
+					changedItem.To, changedItem.Path[1])
+			}
+		}
+
+		log.Infof("Save new config")
+		copier.Copy(&gCurrentConfig, &newConfig)
+	}
+	//modify updated
+	return nil
+}
+
 func newServer(model *gnmi.Model, config []byte) (*server, error) {
-	s, err := gnmi.NewServer(model, config, nil)
+	s, err := gnmi.NewServer(model, config, gnmiCallback)
 	if err != nil {
 		return nil, err
 	}
