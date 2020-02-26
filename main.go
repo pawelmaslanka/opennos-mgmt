@@ -123,16 +123,22 @@ var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct) er
 	if len(changelog) > 0 {
 		log.Infof("Configuration has been changed")
 		for _, changedItem := range changelog {
-			if "NativeVlan" == changedItem.Path[4] {
-				port := make([]string, 1)
-				port[0] = changedItem.Path[1]
-				if err := vlan.SetNativeVlan(port, changedItem.To.(uint16)); err != nil {
-					log.Errorf("Failed to set native VLAN")
-					return err
-				}
+			if len(changedItem.Path) > 4 {
+				if "NativeVlan" == changedItem.Path[4] {
+					port := make([]string, 1)
+					port[0] = changedItem.Path[1]
+					if err := vlan.SetNativeVlan(port, changedItem.To.(uint16)); err != nil {
+						log.Errorf("Failed to set native VLAN")
+						return err
+					}
 
-				log.Infof("Native VLAN has been changed to %d on port %s",
-					changedItem.To, changedItem.Path[1])
+					log.Infof("Native VLAN has been changed to %d on port %s",
+						changedItem.To, changedItem.Path[1])
+				}
+			} else if len(changedItem.Path) > 2 {
+				if "Mtu" == changedItem.Path[2] {
+					log.Infof("Changing MTU to %d on port %s", changedItem.To, changedItem.Path[1])
+				}
 			}
 		}
 
