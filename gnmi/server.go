@@ -31,6 +31,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/alediaferia/stackgo"
 	log "github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"github.com/openconfig/gnmi/value"
@@ -43,7 +44,7 @@ import (
 )
 
 // ConfigCallback is the signature of the function to apply a validated config to the physical device.
-type ConfigCallback func(ygot.ValidatedGoStruct) error
+type ConfigCallback func(ygot.ValidatedGoStruct, interface{}) error
 
 var (
 	pbRootPath         = &pb.Path{}
@@ -68,26 +69,27 @@ var (
 //		// Do something ...
 // }
 type Server struct {
-	model    *Model
-	callback ConfigCallback
-
-	config ygot.ValidatedGoStruct
-	mu     sync.RWMutex // mu is the RW lock to protect the access to config
+	model      *Model
+	callback   ConfigCallback
+	cbUserData interface{}
+	config     ygot.ValidatedGoStruct
+	mu         sync.RWMutex // mu is the RW lock to protect the access to config
 }
 
 // NewServer creates an instance of Server with given json config.
-func NewServer(model *Model, config []byte, callback ConfigCallback) (*Server, error) {
+func NewServer(model *Model, config []byte, callback ConfigCallback, cbUserData interface{}) (*Server, error) {
 	rootStruct, err := model.NewConfigStruct(config)
 	if err != nil {
 		return nil, err
 	}
 	s := &Server{
-		model:    model,
-		config:   rootStruct,
-		callback: callback,
+		model:      model,
+		config:     rootStruct,
+		callback:   callback,
+		cbUserData: cbUserData,
 	}
 	if config != nil && s.callback != nil {
-		if err := s.callback(rootStruct); err != nil {
+		if err := s.callback(rootStruct, cbUserData); err != nil {
 			return nil, err
 		}
 	}
@@ -163,8 +165,8 @@ func (s *Server) doDelete(jsonTree map[string]interface{}, prefix, path *pb.Path
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		if s.callback != nil {
-			if applyErr := s.callback(newConfig); applyErr != nil {
-				if rollbackErr := s.callback(s.config); rollbackErr != nil {
+			if applyErr := s.callback(newConfig, s.cbUserData); applyErr != nil {
+				if rollbackErr := s.callback(s.config, s.cbUserData); rollbackErr != nil {
 					return nil, status.Errorf(codes.Internal, "error in rollback the failed operation (%v): %v", applyErr, rollbackErr)
 				}
 				return nil, status.Errorf(codes.Aborted, "error in applying operation to device: %v", applyErr)
@@ -180,7 +182,7 @@ func (s *Server) doDelete(jsonTree map[string]interface{}, prefix, path *pb.Path
 // doReplaceOrUpdate validates the replace or update operation to be applied to
 // the device, modifies the json tree of the config struct, then calls the
 // callback function to apply the operation to the device hardware.
-func (s *Server) doReplaceOrUpdate(jsonTree map[string]interface{}, op pb.UpdateResult_Operation, prefix, path *pb.Path, val *pb.TypedValue) (*pb.UpdateResult, error) {
+func (s *Server) doReplaceOrUpdate(jsonTree map[string]interface{}, op pb.UpdateResult_Operation, prefix, path *pb.Path, val *pb.TypedValue) (ygot.ValidatedGoStruct, error) {
 	// Validate the operation.
 	fullPath := gnmiFullPath(prefix, path)
 	emptyNode, stat := ygotutils.NewNode(s.model.structRootType, fullPath)
@@ -258,19 +260,7 @@ func (s *Server) doReplaceOrUpdate(jsonTree map[string]interface{}, op pb.Update
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// Apply the validated operation to the device.
-	if s.callback != nil {
-		if applyErr := s.callback(newConfig); applyErr != nil {
-			if rollbackErr := s.callback(s.config); rollbackErr != nil {
-				return nil, status.Errorf(codes.Internal, "error in rollback the failed operation (%v): %v", applyErr, rollbackErr)
-			}
-			return nil, status.Errorf(codes.Aborted, "error in applying operation to device: %v", applyErr)
-		}
-	}
-	return &pb.UpdateResult{
-		Path: path,
-		Op:   op,
-	}, nil
+	return newConfig, nil
 }
 
 func (s *Server) toGoStruct(jsonTree map[string]interface{}) (ygot.ValidatedGoStruct, error) {
@@ -584,19 +574,49 @@ func (s *Server) Set(ctx context.Context, req *pb.SetRequest) (*pb.SetResponse, 
 		}
 		results = append(results, res)
 	}
+
+	configUpdates := stackgo.NewStack()
+	// validatedGoStructs := make([]ygot.ValidatedGoStruct, len(req.GetReplace())+len(req.GetUpdate())))
 	for _, upd := range req.GetReplace() {
-		res, grpcStatusError := s.doReplaceOrUpdate(jsonTree, pb.UpdateResult_REPLACE, prefix, upd.GetPath(), upd.GetVal())
+		updatedConfig, grpcStatusError := s.doReplaceOrUpdate(jsonTree, pb.UpdateResult_REPLACE, prefix, upd.GetPath(), upd.GetVal())
 		if grpcStatusError != nil {
 			return nil, grpcStatusError
+		}
+
+		configUpdates.Push(updatedConfig)
+
+		res := &pb.UpdateResult{
+			Path: upd.GetPath(),
+			Op:   pb.UpdateResult_REPLACE,
 		}
 		results = append(results, res)
 	}
 	for _, upd := range req.GetUpdate() {
-		res, grpcStatusError := s.doReplaceOrUpdate(jsonTree, pb.UpdateResult_UPDATE, prefix, upd.GetPath(), upd.GetVal())
+		updatedConfig, grpcStatusError := s.doReplaceOrUpdate(jsonTree, pb.UpdateResult_UPDATE, prefix, upd.GetPath(), upd.GetVal())
 		if grpcStatusError != nil {
 			return nil, grpcStatusError
 		}
+
+		configUpdates.Push(updatedConfig)
+		res := &pb.UpdateResult{
+			Path: upd.GetPath(),
+			Op:   pb.UpdateResult_UPDATE,
+		}
 		results = append(results, res)
+	}
+
+	for configUpdates.Size() > 0 {
+		// Apply the validated operation to the device.
+		if s.callback != nil {
+			if applyErr := s.callback(configUpdates.Top().(ygot.ValidatedGoStruct), s.cbUserData); applyErr != nil {
+				if rollbackErr := s.callback(s.config, s.cbUserData); rollbackErr != nil {
+					return nil, status.Errorf(codes.Internal, "error in rollback the failed operation (%v): %v", applyErr, rollbackErr)
+				}
+				return nil, status.Errorf(codes.Aborted, "error in applying operation to device: %v", applyErr)
+			} else {
+				break
+			}
+		}
 	}
 
 	jsonDump, err := json.Marshal(jsonTree)

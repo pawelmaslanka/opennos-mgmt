@@ -1,40 +1,728 @@
 {
-  "openconfig-interfaces:interfaces": {
+  "components": {
+    "component": [
+      {
+        "name": "eth-1",
+        "port": {
+          "breakout-mode": {
+            "config": {
+              "channel-speed": "SPEED_100GB",
+              "num-channels": 1
+            }
+          }
+        },
+        "transceiver": {
+          "config": {
+            "fec-mode": "FEC_DISABLED"
+          }
+        }
+      },
+      {
+        "name": "eth-2",
+        "port": {
+          "breakout-mode": {
+            "config": {
+              "channel-speed": "SPEED_100GB",
+              "num-channels": 1
+            }
+          }
+        },
+        "transceiver": {
+          "config": {
+            "fec-mode": "FEC_DISABLED"
+          }
+        }
+      },
+      {
+        "name": "eth-3",
+        "port": {
+          "breakout-mode": {
+            "config": {
+              "channel-speed": "SPEED_100GB",
+              "num-channels": 1
+            }
+          }
+        },
+        "transceiver": {
+          "config": {
+            "fec-mode": "FEC_DISABLED"
+          }
+        }
+      },
+      {
+        "name": "eth-4",
+        "port": {
+          "breakout-mode": {
+            "config": {
+              "channel-speed": "SPEED_100GB",
+              "num-channels": 1
+            }
+          }
+        },
+        "transceiver": {
+          "config": {
+            "fec-mode": "FEC_DISABLED"
+          }
+        }
+      },
+      {
+        "name": "eth-5",
+        "port": {
+          "breakout-mode": {
+            "config": {
+              "channel-speed": "SPEED_100GB",
+              "num-channels": 1
+            }
+          }
+        },
+        "transceiver": {
+          "config": {
+            "fec-mode": "FEC_DISABLED"
+          }
+        }
+      },
+      {
+        "name": "eth-6",
+        "port": {
+          "breakout-mode": {
+            "config": {
+              "channel-speed": "SPEED_10GB",
+              "num-channels": 4
+            }
+          }
+        },
+        "transceiver": {
+          "config": {
+            "fec-mode": "FEC_DISABLED"
+          }
+        }
+      },
+      {
+        "name": "eth-7",
+        "port": {
+          "breakout-mode": {
+            "config": {
+              "channel-speed": "SPEED_10GB",
+              "num-channels": 4
+            }
+          }
+        },
+        "transceiver": {
+          "config": {
+            "fec-mode": "FEC_DISABLED"
+          }
+        }
+      }
+    ]
+  },
+  "interfaces": {
     "interface": [
       {
-        "name": "admin",
-        "config": {
-          "name": "admin",
-          "mtu": 1514
+        "name": "ae-1",
+        "aggregation": {
+          "config": {
+            "lag-type": "LACP"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1111,
+              "interface-mode": "ACCESS",
+              "native-vlan": 11,
+              "trunk-vlans": [
+                500,
+                600
+              ]
+            }
+          }
+        }
+      },
+      {
+        "name": "ae-2",
+        "aggregation": {
+          "config": {
+            "lag-type": "LACP"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 222,
+              "trunk-vlans": [
+                700,
+                800
+              ]
+            }
+          }
         }
       },
       {
         "name": "eth-1",
         "config": {
-          "description": "QSFP28 No. 1 port with breakout mode speed capability",
+          "description": "QSFP28 No. 1 port with breakout mode capability",
           "mtu": 9412
         },
-        "state": {
-          "admin-status": "UP"
-        },
-        "openconfig-if-ethernet:ethernet": {
-          "openconfig-vlan:switched-vlan": {
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:11",
+            "port-speed": "SPEED_100GB"
+          },
+          "switched-vlan": {
             "config": {
               "access-vlan": 1,
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
-                300,
-                200,
-                "500..505"
-             ]
+                100,
+                101
+              ]
             }
-          },
-          "config": {
-            "port-speed": "SPEED_100GB"
           }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Master port",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.11",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-2",
+        "config": {
+          "description": "QSFP28 No. 2 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "aggregate-id": "ae-1",
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:12",
+            "port-speed": "SPEED_100GB"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                "200..202"
+              ]
+            }
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Master port",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.12",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-3",
+        "config": {
+          "description": "QSFP28 No. 3 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "aggregate-id": "ae-1",
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:13",
+            "port-speed": "SPEED_100GB"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                "300..301",
+                "333..334"
+              ]
+            }
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Master port",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.13",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-4",
+        "config": {
+          "description": "QSFP28 No. 4 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "aggregate-id": "ae-2",
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:14",
+            "port-speed": "SPEED_100GB"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                400
+              ]
+            }
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Master port",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.14",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-5",
+        "config": {
+          "description": "QSFP28 No. 5 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "aggregate-id": "ae-2",
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:15",
+            "port-speed": "SPEED_100GB"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                "500..505"
+              ]
+            }
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Master port",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.15",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-6",
+        "config": {
+          "description": "QSFP28 No. 6 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:16",
+            "port-speed": "SPEED_100GB"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                610,
+                605,
+                "600..601"
+              ]
+            }
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Master port",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.16",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-6.1",
+        "config": {
+          "description": "QSFP28 No. 6 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:13:04:05:61",
+            "port-speed": "SPEED_10GB"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                61
+              ]
+            }
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Slave port no. 1",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.61",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-6.2",
+        "config": {
+          "description": "QSFP28 No. 6 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:62",
+            "port-speed": "SPEED_10GB"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 20,
+              "interface-mode": "ACCESS",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                62
+              ]
+            }
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Slave port no. 2",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.62",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-6.3",
+        "config": {
+          "description": "QSFP28 No. 6 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:63",
+            "port-speed": "SPEED_10GB"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                63
+              ]
+            }
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Slave port no. 3",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.63",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-6.4",
+        "config": {
+          "description": "QSFP28 No. 6 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:64",
+            "port-speed": "SPEED_100GB"
+          },
+          "switched-vlan": {
+            "config": {
+              "access-vlan": 1,
+              "interface-mode": "TRUNK",
+              "native-vlan": 1,
+              "trunk-vlans": [
+                64
+              ]
+            }
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Slave port no. 4",
+                "enabled": true
+              },
+              "ipv4": {
+                "addresses": {
+                  "address": [
+                    {
+                      "config": {
+                        "ip": "10.0.10.64",
+                        "prefix-length": 24
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
         }
       }
     ]
+  },
+  "lacp": {
+    "interfaces": {
+      "interface": [
+        {
+          "config": {
+            "name": "ae-1",
+            "interfval": "SLOW",
+            "lacp-mode": "ACTIVE",
+            "members": {
+              "member": [
+                {
+                  "state": {
+                    "interface": "eth-2",
+                    "collecting": false,
+                    "distributing": false
+                  }
+                },
+                {
+                  "state": {
+                    "interface": "eth-3",
+                    "collecting": false,
+                    "distributing": false
+                  }
+                }
+              ]
+            },
+            "system-id-mac": "01:02:03:04:11:06",
+            "system-priority": 1
+          }
+        },
+        {
+          "config": {
+            "name": "ae-2",
+            "interfval": "SLOW",
+            "lacp-mode": "ACTIVE",
+            "members": {
+              "member": [
+                {
+                  "state": {
+                    "interface": "eth-4",
+                    "collecting": false,
+                    "distributing": false
+                  }
+                },
+                {
+                  "state": {
+                    "interface": "eth-5",
+                    "collecting": false,
+                    "distributing": false
+                  }
+                }
+              ]
+            },
+            "system-id-mac": "01:02:03:04:12:07",
+            "system-priority": 1
+          }
+        }
+      ]
+    }
   }
 }
