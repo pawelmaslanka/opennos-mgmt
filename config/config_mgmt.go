@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"opennos-mgmt/gnmi"
 	"opennos-mgmt/gnmi/modeldata/oc"
@@ -8,6 +9,8 @@ import (
 	cmd "opennos-mgmt/config/command"
 
 	log "github.com/golang/glog"
+	"github.com/jinzhu/copier"
+	"github.com/openconfig/ygot/ygot"
 	"github.com/r3labs/diff"
 	"google.golang.org/grpc"
 
@@ -69,17 +72,126 @@ const (
 	stpBaseIdx                  = vlanBaseIdx + maxVlansC
 )
 
-type CfgMngrT struct {
-	cfgLookupTbl *configLookupTablesT
+type cmdByIfnameT map[string]cmd.CommandI
+
+type ConfigMngrT struct {
+	configLookupTbl         *configLookupTablesT
+	runningConfig           ygot.ValidatedGoStruct
+	cmdByIfname             [MaxNumberOfActionsInTransactionC]cmdByIfnameT
+	ethSwitchMgmtClientConn *grpc.ClientConn
+	ethSwitchMgmtClient     *mgmt.EthSwitchMgmtClient
+	// transactions    [TransactionIdx][MaxNumberOfActionsInTransactionC]cmdByIfnameT
+	// transConfigLookupTbl every queued command should remove dependency from here
+	// e.g. when LAG is going to be remove, we should remove ports from this LAG, and LAG itself
+	transConfigLookupTbl *configLookupTablesT
+	transHasBeenStarted  bool
 }
 
-func NewCfgMngrT() *CfgMngrT {
-	return &CfgMngrT{
-		cfgLookupTbl: newConfigLookupTables(),
+func NewConfigMngrT() *ConfigMngrT {
+	return &ConfigMngrT{
+		configLookupTbl:     newConfigLookupTables(),
+		transHasBeenStarted: false,
 	}
 }
 
-func (mngr *CfgMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
+func (this *ConfigMngrT) NewTransaction() error {
+	if this.transHasBeenStarted {
+		return errors.New("Transaction is already active")
+	}
+	conn, err := grpc.Dial(fmt.Sprintf(":%d", serv_param.MgmtListeningTcpPortC), grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Errorf("Failed to dial into the switch gRPC server: %v", err)
+		return err
+	}
+	ethSwitchMgmtClient := mgmt.NewEthSwitchMgmtClient(conn)
+	nilCmd := &cmd.NilCmdT{}
+	var i OrdinalNumberT
+	for i = 0; i < MaxNumberOfActionsInTransactionC; i++ {
+		this.cmdByIfname[i] = make(cmdByIfnameT, 1)
+		this.cmdByIfname[i][nilCmd.GetName()] = nilCmd
+	}
+
+	this.transConfigLookupTbl = newConfigLookupTables()
+	copier.Copy(&this.transConfigLookupTbl, &this.configLookupTbl)
+	this.ethSwitchMgmtClientConn = conn
+	this.ethSwitchMgmtClient = &ethSwitchMgmtClient
+	this.transHasBeenStarted = true
+	return nil
+}
+
+func (this *ConfigMngrT) Commit() error {
+	if !this.transHasBeenStarted {
+		return errors.New("Transaction not has been started")
+	}
+
+	var i OrdinalNumberT
+	for i = 0; i < MaxNumberOfActionsInTransactionC; i++ {
+		for _, command := range this.cmdByIfname[i] {
+			if err := command.Execute(); err != nil {
+				for i > 0 {
+					i--
+					command.Undo()
+				}
+				this.DiscardOrFinishTrans()
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func (this *ConfigMngrT) Rollback() error {
+	if !this.transHasBeenStarted {
+		return errors.New("Transaction not has been started")
+	}
+
+	i := MaxNumberOfActionsInTransactionC
+	for i > 0 {
+		i--
+		for _, command := range this.cmdByIfname[i] {
+			if err := command.Undo(); err != nil {
+				for i < MaxNumberOfActionsInTransactionC {
+					i++
+					command.Execute()
+				}
+				return err
+			}
+		}
+	}
+
+	this.DiscardOrFinishTrans()
+	return nil
+}
+
+func (this *ConfigMngrT) CommitConfirm() error {
+	if !this.transHasBeenStarted {
+		return errors.New("Transaction not has been started")
+	}
+	this.DiscardOrFinishTrans()
+	return nil
+}
+
+func (this *ConfigMngrT) Confirm() error {
+	if !this.transHasBeenStarted {
+		return errors.New("Transaction not has been started")
+	}
+	// TODO: Implement logic
+	return nil
+}
+
+func (this *ConfigMngrT) DiscardOrFinishTrans() error {
+	if !this.transHasBeenStarted {
+		return errors.New("Transaction not has been started")
+	}
+	this.ethSwitchMgmtClientConn.Close()
+	this.ethSwitchMgmtClient = nil
+	this.transConfigLookupTbl = nil
+	this.transHasBeenStarted = false
+	return nil
+}
+
+func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 	configModel, err := model.NewConfigStruct(config)
 	if err != nil {
 		return err
@@ -88,12 +200,12 @@ func (mngr *CfgMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 	log.Infof("Dump config model: %+v", configModel)
 	device := configModel.(*oc.Device)
 	for intfName, _ := range device.Interface {
-		if err := mngr.cfgLookupTbl.addNewInterfaceIfItDoesNotExist(intfName); err != nil {
+		if err := this.configLookupTbl.addNewInterfaceIfItDoesNotExist(intfName); err != nil {
 			return err
 		}
 	}
 
-	for intfName, _ := range mngr.cfgLookupTbl.idxByIntfName {
+	for intfName, _ := range this.configLookupTbl.idxByIntfName {
 		intf := device.Interface[intfName]
 		if intf == nil {
 			log.Info("Cannot find interface ", intfName)
@@ -103,13 +215,13 @@ func (mngr *CfgMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 		eth := intf.GetEthernet()
 		if eth != nil {
 			log.Infof("Configuring interface %s as LAG member", intfName)
-			if err := mngr.cfgLookupTbl.parseInterfaceAsLagMember(intfName, eth); err != nil {
+			if err := this.configLookupTbl.parseInterfaceAsLagMember(intfName, eth); err != nil {
 				return err
 			}
 
 			swVlan := eth.GetSwitchedVlan()
 			if swVlan != nil {
-				if err := mngr.cfgLookupTbl.parseVlanForIntf(intfName, swVlan); err != nil {
+				if err := this.configLookupTbl.parseVlanForIntf(intfName, swVlan); err != nil {
 					return err
 				}
 			}
@@ -117,13 +229,13 @@ func (mngr *CfgMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 
 		subIntf := intf.GetSubinterface(0)
 		if subIntf != nil {
-			if err := mngr.cfgLookupTbl.parseSubinterface(intfName, subIntf); err != nil {
+			if err := this.configLookupTbl.parseSubinterface(intfName, subIntf); err != nil {
 				return err
 			}
 		}
 	}
 
-	for lagName, _ := range mngr.cfgLookupTbl.idxByLagName {
+	for lagName, _ := range this.configLookupTbl.idxByLagName {
 		lag := device.Interface[lagName]
 		if lag == nil {
 			return fmt.Errorf("Failed to get LAG %s info", lagName)
@@ -133,24 +245,24 @@ func (mngr *CfgMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 		if agg != nil {
 			swVlan := agg.GetSwitchedVlan()
 			if swVlan != nil {
-				if err := mngr.cfgLookupTbl.parseVlanForLagIntf(lagName, swVlan); err != nil {
+				if err := this.configLookupTbl.parseVlanForLagIntf(lagName, swVlan); err != nil {
 					return err
 				}
 			}
 		}
 	}
 
-	mngr.cfgLookupTbl.dump()
+	this.configLookupTbl.dump()
 	// TODO: Check if there isn't inconsistency in VLANs between ethernet
 	//       interface and aggregate ethernet interfaces
 
 	log.Infof("There are loaded %d interfaces and %d LAGs",
-		mngr.cfgLookupTbl.idxOfLastAddedIntf, mngr.cfgLookupTbl.idxOfLastAddedLag)
+		this.configLookupTbl.idxOfLastAddedIntf, this.configLookupTbl.idxOfLastAddedLag)
 
-	return nil
+	return this.CommitCandidateConfig(&configModel)
 }
 
-func (mngr *CfgMngrT) IsChangedBreakoutMode(change *diff.Change) bool {
+func (this *ConfigMngrT) IsChangedPortBreakout(change *diff.Change) bool {
 	if len(change.Path) < cmd.PortBreakoutPathItemsCountC {
 		return false
 	}
@@ -162,18 +274,29 @@ func (mngr *CfgMngrT) IsChangedBreakoutMode(change *diff.Change) bool {
 	return true
 }
 
-func (mngr *CfgMngrT) IsIntfAvailable(ifname string) bool {
-	if _, exists := mngr.cfgLookupTbl.idxByIntfName[ifname]; exists {
+func (this *ConfigMngrT) IsChangedPortBreakoutChanSpeed(change *diff.Change) bool {
+	if len(change.Path) < cmd.PortBreakoutPathItemsCountC {
+		return false
+	}
+
+	if (change.Path[cmd.PortBreakoutCompPathItemIdxC] != cmd.PortBreakoutCompPathItemC) || (change.Path[cmd.PortBreakoutPortPathItemIdxC] != cmd.PortBreakoutPortPathItemC) || (change.Path[cmd.PortBreakoutModePathItemIdxC] != cmd.PortBreakoutModePathItemC) || ((change.Path[cmd.PortBreakoutNumChanPathItemIdxC] != cmd.PortBreakoutNumChanPathItemC) && (change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] != cmd.PortBreakoutChanSpeedPathItemC)) {
+		return false
+	}
+
+	return true
+}
+
+func (this *ConfigMngrT) IsIntfAvailable(ifname string) bool {
+	if _, exists := this.configLookupTbl.idxByIntfName[ifname]; exists {
 		return true
 	}
 
 	return false
 }
 
-func (mngr *CfgMngrT) CheckingPortBreakoutModeDependency(changedItem *diff.Change, changelog *diff.Changelog) error {
-	// TODO: First of all, find all action related to interface(s) which is/are going to be removed.
+func (this *ConfigMngrT) ValidatePortBreakoutChanging(changedItem *diff.Change, changelog *diff.Changelog) error {
 	ifname := changedItem.Path[cmd.PortBreakoutIfnamePathItemIdxC]
-	if !mngr.IsIntfAvailable(ifname) {
+	if !this.IsIntfAvailable(ifname) {
 		return fmt.Errorf("Port %s is unrecognized", ifname)
 	}
 
@@ -184,33 +307,33 @@ func (mngr *CfgMngrT) CheckingPortBreakoutModeDependency(changedItem *diff.Chang
 	var err error
 
 	if changedItem.Path[cmd.PortBreakoutNumChanPathItemIdxC] == cmd.PortBreakoutNumChanPathItemC {
-		channelSpeed, err = mngr.getPortBreakoutChannelSpeedFromChangelog(ifname, changelog)
+		channelSpeed, err = this.getPortBreakoutChannelSpeedFromChangelog(ifname, changelog)
 		if err != nil {
 			return err
 		}
 
 		numChannels = cmd.PortBreakoutModeT(changedItem.To.(uint8))
-		if !mngr.isValidPortBreakoutNumChannels(numChannels) {
+		if !this.isValidPortBreakoutNumChannels(numChannels) {
 			return fmt.Errorf("Number of channels (%d) to breakout is invalid", numChannels)
 		}
 
-		channelSpeedChangeItem, err = mngr.getPortBreakoutChannelSpeedChangeItemFromChangelog(ifname, changelog)
+		channelSpeedChangeItem, err = this.getPortBreakoutChannelSpeedChangeItemFromChangelog(ifname, changelog)
 		if err != nil {
 			return err
 		}
 		numChannelsChangeItem = changedItem
 	} else if changedItem.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] == cmd.PortBreakoutChanSpeedPathItemC {
-		numChannels, err = mngr.getPortBreakoutNumChannelsFromChangelog(ifname, changelog)
+		numChannels, err = this.getPortBreakoutNumChannelsFromChangelog(ifname, changelog)
 		if err != nil {
-			return err
+			return this.validatePortBreakoutChannSpeedChanging(changedItem, changelog)
 		}
 
 		channelSpeed = changedItem.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
-		if !mngr.isValidPortBreakoutChannelSpeed(numChannels, channelSpeed) {
+		if !this.isValidPortBreakoutChannelSpeed(numChannels, channelSpeed) {
 			return fmt.Errorf("Speed channel (%d) is invalid", channelSpeed)
 		}
 
-		numChannelsChangeItem, err = mngr.getPortBreakoutNumChannelsChangeItemFromChangelog(ifname, changelog)
+		numChannelsChangeItem, err = this.getPortBreakoutNumChannelsChangeItemFromChangelog(ifname, changelog)
 		if err != nil {
 			return err
 		}
@@ -220,167 +343,45 @@ func (mngr *CfgMngrT) CheckingPortBreakoutModeDependency(changedItem *diff.Chang
 	}
 
 	log.Infof("Requested changing port %s breakout into %d mode with speed %d", ifname, numChannels, channelSpeed)
-	conn, err := grpc.Dial(fmt.Sprintf(":%d", serv_param.MgmtListeningTcpPortC), grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("Failed to dial into the switch gRPC server: %v", err)
-		return err
-	}
-	defer conn.Close()
-	ethSwitchMgmtClient := mgmt.NewEthSwitchMgmtClient(conn)
-	setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem, channelSpeedChangeItem, &ethSwitchMgmtClient)
-	if err = setPortBreakoutCmd.Execute(); err != nil {
-		return fmt.Errorf("Failed to execute set port breakout request: %s", err)
-	}
-
-	if err = setPortBreakoutCmd.Undo(); err != nil {
-		return fmt.Errorf("Failed to withdraw port breakout request: %s", err)
-	}
+	setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem, channelSpeedChangeItem, this.ethSwitchMgmtClient)
 	if numChannels == cmd.PortBreakoutModeNoneC {
-		// Check if there won't be any dependenies from master port
-	} else {
+		// Check if there won't be any dependencies from slave port
 		slavePorts := make([]string, cmd.PortBreakoutMode4xC)
 		for i := 1; i <= 4; i++ {
 			slavePorts[i-1] = fmt.Sprintf("%s.%d", ifname, i)
 			log.Infof("Composed slave port: %s", slavePorts[i-1])
+			slaveIfname := slavePorts[i-1]
+			idx := this.transConfigLookupTbl.idxByIntfName[slaveIfname]
+			// TODO: Go through by all dependencies like ther ordinal number
+			if ip4, exists := this.transConfigLookupTbl.ipv4ByIntf[idx]; exists {
+				return fmt.Errorf("Cannot %q because there is dependency from IPv4 %s", setPortBreakoutCmd.GetName(), ip4.Strings()[0])
+			}
 		}
-		// Check if there won't be any dependenies from slave ports
+	} else {
+		// Check if there won't be any dependenies from master ports
+	}
+
+	// TODO: Remove this code: Execute/Undo
+	if err = setPortBreakoutCmd.Execute(); err != nil {
+		return fmt.Errorf("Failed to execute set port breakout request: %s", err)
+	}
+	if err = setPortBreakoutCmd.Undo(); err != nil {
+		return fmt.Errorf("Failed to withdraw port breakout request: %s", err)
+	}
+
+	if this.transHasBeenStarted {
+		setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem, channelSpeedChangeItem, this.ethSwitchMgmtClient)
+		return this.appendSetPortBreakoutCmdToTransaction(ifname, setPortBreakoutCmd)
 	}
 
 	return nil
 }
 
-// No exported data
-func (mngr *CfgMngrT) getPortBreakoutChannelSpeedFromChangelog(ifname string, changelog *diff.Changelog) (oc.E_OpenconfigIfEthernet_ETHERNET_SPEED, error) {
-	var err error = nil
-	channelSpeed := oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
-	for _, change := range *changelog {
-		if mngr.isChangedPortBreakoutChannelSpeed(&change) {
-			log.Infof("Found channel speed request too:\n%+v", change)
-			if change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
-				channelSpeed = change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
-				break
-			}
-		}
-	}
-
-	if channelSpeed == oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET {
-		err = fmt.Errorf("Could not found set channel speed request")
-	}
-
-	return channelSpeed, err
+// TODO: Maybe move it into DiscardOrFinishTrans()
+func (this *ConfigMngrT) CommitCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) error {
+	return copier.Copy(&this.runningConfig, candidateConfig)
 }
 
-func (mngr *CfgMngrT) getPortBreakoutChannelSpeedChangeItemFromChangelog(ifname string, changelog *diff.Changelog) (*diff.Change, error) {
-	var err error = nil
-	var changeItem *diff.Change
-	channelSpeed := oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
-	for _, change := range *changelog {
-		if mngr.isChangedPortBreakoutChannelSpeed(&change) {
-			log.Infof("Found channel speed request too:\n%+v", change)
-			if change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
-				channelSpeed = change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
-				changeItem = &change
-				break
-			}
-		}
-	}
-
-	if channelSpeed == oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET {
-		err = fmt.Errorf("Could not found set channel speed request")
-	}
-
-	return changeItem, err
-}
-
-func (mngr *CfgMngrT) isChangedPortBreakoutChannelSpeed(change *diff.Change) bool {
-	if len(change.Path) < cmd.PortBreakoutPathItemsCountC {
-		return false
-	}
-
-	if (change.Path[cmd.PortBreakoutCompPathItemIdxC] != cmd.PortBreakoutCompPathItemC) || (change.Path[cmd.PortBreakoutPortPathItemIdxC] != cmd.PortBreakoutPortPathItemC) || (change.Path[cmd.PortBreakoutModePathItemIdxC] != cmd.PortBreakoutModePathItemC) || (change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] != cmd.PortBreakoutChanSpeedPathItemC) {
-		return false
-	}
-
-	return true
-}
-
-func (mngr *CfgMngrT) isChangedPortBreakoutNumChannels(change *diff.Change) bool {
-	if len(change.Path) < cmd.PortBreakoutPathItemsCountC {
-		return false
-	}
-
-	if (change.Path[cmd.PortBreakoutCompPathItemIdxC] != cmd.PortBreakoutCompPathItemC) || (change.Path[cmd.PortBreakoutPortPathItemIdxC] != cmd.PortBreakoutPortPathItemC) || (change.Path[cmd.PortBreakoutModePathItemIdxC] != cmd.PortBreakoutModePathItemC) || (change.Path[cmd.PortBreakoutNumChanPathItemIdxC] != cmd.PortBreakoutNumChanPathItemC) {
-		return false
-	}
-
-	return true
-}
-
-func (mngr *CfgMngrT) isValidPortBreakoutNumChannels(numChannels cmd.PortBreakoutModeT) bool {
-	if numChannels == cmd.PortBreakoutModeNoneC || numChannels == cmd.PortBreakoutMode4xC {
-		return true
-	}
-
-	return false
-}
-
-func (mngr *CfgMngrT) isValidPortBreakoutChannelSpeed(numChannels cmd.PortBreakoutModeT,
-	channelSpeed oc.E_OpenconfigIfEthernet_ETHERNET_SPEED) bool {
-	log.Infof("Split (%d), speed (%d)", numChannels, channelSpeed)
-	switch channelSpeed {
-	case oc.OpenconfigIfEthernet_ETHERNET_SPEED_SPEED_10GB:
-		if numChannels == cmd.PortBreakoutMode4xC {
-			return true
-		}
-	case oc.OpenconfigIfEthernet_ETHERNET_SPEED_SPEED_100GB:
-		fallthrough
-	case oc.OpenconfigIfEthernet_ETHERNET_SPEED_SPEED_40GB:
-		if numChannels == cmd.PortBreakoutModeNoneC {
-			return true
-		}
-	}
-
-	return false
-}
-
-func (mngr *CfgMngrT) getPortBreakoutNumChannelsFromChangelog(ifname string, changelog *diff.Changelog) (cmd.PortBreakoutModeT, error) {
-	var err error = nil
-	numChannels := cmd.PortBreakoutModeInvalidC
-	for _, change := range *changelog {
-		if mngr.isChangedPortBreakoutNumChannels(&change) {
-			log.Infof("Found changing number of channels request too:\n%+v", change)
-			if change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
-				numChannels = cmd.PortBreakoutModeT(change.To.(uint8))
-				break
-			}
-		}
-	}
-
-	if !mngr.isValidPortBreakoutNumChannels(numChannels) {
-		err = fmt.Errorf("Number of channels (%d) to breakout is invalid", numChannels)
-	}
-
-	return numChannels, err
-}
-
-func (mngr *CfgMngrT) getPortBreakoutNumChannelsChangeItemFromChangelog(ifname string, changelog *diff.Changelog) (*diff.Change, error) {
-	var err error = nil
-	var changeItem *diff.Change
-	numChannels := cmd.PortBreakoutModeInvalidC
-	for _, change := range *changelog {
-		if mngr.isChangedPortBreakoutNumChannels(&change) {
-			log.Infof("Found changing number of channels request too:\n%+v", change)
-			if change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
-				numChannels = cmd.PortBreakoutModeT(change.To.(uint8))
-				changeItem = &change
-				break
-			}
-		}
-	}
-
-	if !mngr.isValidPortBreakoutNumChannels(numChannels) {
-		err = fmt.Errorf("Number of channels (%d) to breakout is invalid", numChannels)
-	}
-
-	return changeItem, err
+func (this *ConfigMngrT) GetDiffRunningConfigWithCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) (diff.Changelog, error) {
+	return diff.Diff(this.runningConfig, *candidateConfig)
 }

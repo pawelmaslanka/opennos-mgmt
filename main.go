@@ -10,12 +10,9 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"sync"
 
 	"github.com/abiosoft/ishell"
 	log "github.com/golang/glog"
-	"github.com/jinzhu/copier"
-	"github.com/r3labs/diff"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -102,11 +99,6 @@ type server struct {
 	*gnmi.Server
 }
 
-var gCurrentConfig ygot.ValidatedGoStruct
-var doOnce sync.Once
-
-type ethSpeedT oc.E_OpenconfigIfEthernet_ETHERNET_SPEED
-
 type transactionMngrT struct {
 	cmds [cfg.MaxNumberOfActionsInTransactionC]cmd.CommandI
 }
@@ -121,31 +113,9 @@ func NewTransactionMngrT() *transactionMngrT {
 	return &t
 }
 
-type ChangeItemT struct {
-	change    *diff.Change
-	ordinalNo uint16
-	isDeleted bool
-	isUpdated bool
-	isCreated bool
-}
-
-func NewTransactionItemT(change *diff.Change, oridnalNo uint16) *ChangeItemT {
-	return &ChangeItemT{
-		change:    change,
-		ordinalNo: oridnalNo,
-		isDeleted: change.Type == diff.DELETE,
-		isUpdated: change.Type == diff.UPDATE,
-		isCreated: change.Type == diff.CREATE,
-	}
-}
-
 var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cbUserData interface{}) error {
-	doOnce.Do(func() {
-		copier.Copy(&gCurrentConfig, &newConfig)
-	})
-
-	cfgMngr := cbUserData.(*cfg.CfgMngrT)
-	changelog, err := diff.Diff(gCurrentConfig, newConfig)
+	configMngr := cbUserData.(*cfg.ConfigMngrT)
+	changelog, err := configMngr.GetDiffRunningConfigWithCandidateConfig(&newConfig)
 	if err != nil {
 		log.Errorf("Failed to get diff of two config objects: %s", err)
 		return err
@@ -160,11 +130,15 @@ var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cb
 	log.Infof("Dump JSON: %s", string(jsonDump))
 	if len(changelog) > 0 {
 		log.Infof("Configuration has been changed")
+		if err := configMngr.NewTransaction(); err != nil {
+			log.Errorf("Failed to start new transaction")
+			return err
+		}
 		for _, changedItem := range changelog {
 			log.Infof("Change item: %#v", changedItem)
 			if len(changedItem.Path) > 4 {
-				if cfgMngr.IsChangedBreakoutMode(&changedItem) {
-					if err := cfgMngr.CheckingPortBreakoutModeDependency(&changedItem, &changelog); err != nil {
+				if configMngr.IsChangedPortBreakout(&changedItem) {
+					if err := configMngr.ValidatePortBreakoutChanging(&changedItem, &changelog); err != nil {
 						log.Errorf("%s", err)
 						return err
 					}
@@ -187,21 +161,25 @@ var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cb
 			}
 		}
 
+		if err := configMngr.DiscardOrFinishTrans(); err != nil {
+			log.Errorf("Failed to finish transaction")
+			return err
+		}
 		log.Infof("Save new config")
-		copier.Copy(&gCurrentConfig, &newConfig)
+		return configMngr.CommitCandidateConfig(&newConfig) // TODO: Maybe move it into DiscardOrFinishTrans()
 	}
 	//modify updated
 	return nil
 }
 
 func newServer(model *gnmi.Model, config []byte) (*server, error) {
-	cfgMngr := cfg.NewCfgMngrT()
-	err := cfgMngr.LoadConfig(model, config)
+	configMngr := cfg.NewConfigMngrT()
+	err := configMngr.LoadConfig(model, config)
 	if err != nil {
 		return nil, err
 	}
 
-	s, err := gnmi.NewServer(model, config, gnmiCallback, cfgMngr)
+	s, err := gnmi.NewServer(model, config, gnmiCallback, configMngr)
 	if err != nil {
 		return nil, err
 	}

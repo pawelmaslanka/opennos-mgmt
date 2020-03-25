@@ -52,21 +52,26 @@ func NewSetPortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Change,
 
 // Execute implements the same method from CommandI interface and breaks out front panel port
 // into multiple logical ports
-func (cmd *SetPortBreakoutCmdT) Execute() error {
+func (this *SetPortBreakoutCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return cmd.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
+	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
-func (cmd *SetPortBreakoutCmdT) Undo() error {
+func (this *SetPortBreakoutCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return cmd.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
+	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
-func (cmd *SetPortBreakoutCmdT) GetName() string {
-	return cmd.name
+func (this *SetPortBreakoutCmdT) GetName() string {
+	return this.name
+}
+
+func (this *SetPortBreakoutCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*SetPortBreakoutCmdT)
+	return this.equals(otherCmd.commandT)
 }
 
 // WithdrawPortBreakoutCmdT implements command for combine Ccmbine multiple logical ports into
@@ -88,21 +93,21 @@ func NewWithdrawPortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Ch
 
 // Execute implements the same method from CommandI interface and combines multiple logical
 // ports into single port
-func (cmd *WithdrawPortBreakoutCmdT) Execute() error {
+func (this *WithdrawPortBreakoutCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return cmd.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
+	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
-func (cmd *WithdrawPortBreakoutCmdT) Undo() error {
+func (this *WithdrawPortBreakoutCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return cmd.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
+	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
-func (cmd *WithdrawPortBreakoutCmdT) GetName() string {
-	return cmd.name
+func (this *WithdrawPortBreakoutCmdT) GetName() string {
+	return this.name
 }
 
 // SetPortBreakoutSpeedCmdT implements command for change speed onto multiple logical ports
@@ -117,27 +122,27 @@ const (
 	maxChangeIdxC
 )
 
-// It cannot work if you would want to be like this: func doPortBreakoutCmd(cmd *commandT, shouldBeAbleOnlyToUndo bool) error
-func (cmd *commandT) doPortBreakoutCmd(shouldBeAbleOnlyToUndo bool) error {
-	if cmd.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return cmd.createErrorAccordingToExecutionState()
+// It cannot work if you would want to be like this: func doPortBreakoutCmd(this *commandT, shouldBeAbleOnlyToUndo bool) error
+func (this *commandT) doPortBreakoutCmd(shouldBeAbleOnlyToUndo bool) error {
+	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return this.createErrorAccordingToExecutionState()
 	}
 
-	cmd.dumpInternalData()
-	numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(cmd.changes[numChannelsChangeIdxC].To.(uint8)))
+	this.dumpInternalData()
+	numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
 	if err != nil {
 		return err
 	}
 
-	channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(cmd.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
+	channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
 	if err != nil {
 		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err = (*cmd.ethSwitchMgmt).SetPortBreakout(ctx, &mgmt.PortBreakoutRequest{
-		Ifname:       cmd.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
+	_, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &mgmt.PortBreakoutRequest{
+		Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
 		NumChannels:  numChannels,
 		ChannelSpeed: channelSpeed,
 	})
@@ -145,7 +150,7 @@ func (cmd *commandT) doPortBreakoutCmd(shouldBeAbleOnlyToUndo bool) error {
 		return err
 	}
 
-	cmd.finalize()
+	this.finalize()
 	return nil
 }
 

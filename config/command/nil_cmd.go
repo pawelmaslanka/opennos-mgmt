@@ -16,5 +16,9 @@ func (c *NilCmdT) Undo() error {
 
 // GetName is a stub method of Command pattern interface
 func (c *NilCmdT) GetName() string {
-	return ""
+	return "nil"
+}
+
+func (this *NilCmdT) Equals(cmd CommandI) bool {
+	return this.GetName() == cmd.GetName()
 }

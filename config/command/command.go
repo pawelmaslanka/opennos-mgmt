@@ -18,6 +18,8 @@ type CommandI interface {
 	Undo() error
 	// GetName returns name of derived command
 	GetName() string
+	// EqualTo checks if 'this' command is equal to another 'cmd'
+	Equals(cmd CommandI) bool
 }
 
 // commandT is desired to embed in derivation type of Command pattern interface for use common
@@ -80,4 +82,32 @@ func (cmd *commandT) dumpInternalData() {
 		}
 	}
 	log.Printf("Has been already executed: %v", cmd.hasBeenExecuted)
+}
+
+func (this *commandT) equals(other *commandT) bool {
+	if this.name != other.name {
+		return false
+	} else if len(this.changes) != len(other.changes) {
+		return false
+	}
+
+	for i, change := range this.changes {
+		if change.Type != other.changes[i].Type {
+			return false
+		} else if len(change.Path) != len(other.changes[i].Path) {
+			return false
+		} else if change.From != other.changes[i].From {
+			return false
+		} else if change.To != other.changes[i].To {
+			return false
+		}
+
+		for j, item := range change.Path {
+			if item != other.changes[i].Path[j] {
+				return false
+			}
+		}
+	}
+
+	return true
 }
