@@ -74,39 +74,39 @@ func (this *SetPortBreakoutCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
-// WithdrawPortBreakoutCmdT implements command for combine Ccmbine multiple logical ports into
+// deletePortBreakoutCmdT implements command for combine Ccmbine multiple logical ports into
 // single port
 // TODO: Consider if it is needed because we don't removing any parameters, we just edit port breakout mode
-type WithdrawPortBreakoutCmdT struct {
+type deletePortBreakoutCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
 }
 
-// NewSetPortBreakoutCmdT create new instance of WithdrawPortBreakoutCmdT type
-func NewWithdrawPortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *WithdrawPortBreakoutCmdT {
+// NewSetPortBreakoutCmdT create new instance of deletePortBreakoutCmdT type
+func NewdeletePortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *deletePortBreakoutCmdT {
 	changes := make([]*diff.Change, maxChangeIdxC)
 	changes[numChannelsChangeIdxC] = numChansChg
 	changes[channelSpeedChangeIdxC] = chanSpeedChg
-	return &WithdrawPortBreakoutCmdT{
+	return &deletePortBreakoutCmdT{
 		commandT: newCommandT("withdraw port breakout", changes, ethSwitchMgmt),
 	}
 }
 
 // Execute implements the same method from CommandI interface and combines multiple logical
 // ports into single port
-func (this *WithdrawPortBreakoutCmdT) Execute() error {
+func (this *deletePortBreakoutCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
 	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
-func (this *WithdrawPortBreakoutCmdT) Undo() error {
+func (this *deletePortBreakoutCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
 	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
-func (this *WithdrawPortBreakoutCmdT) GetName() string {
+func (this *deletePortBreakoutCmdT) GetName() string {
 	return this.name
 }
 

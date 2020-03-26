@@ -102,8 +102,8 @@
         "port": {
           "breakout-mode": {
             "config": {
-              "channel-speed": "SPEED_10GB",
-              "num-channels": 4
+              "channel-speed": "SPEED_100GB",
+              "num-channels": 1
             }
           }
         },
@@ -655,6 +655,146 @@
                     }
                   ]
                 }
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-7",
+        "config": {
+          "description": "QSFP28 No. 1 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:11",
+            "port-speed": "SPEED_100GB"
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Master port",
+                "enabled": true
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-7.1",
+        "config": {
+          "description": "QSFP28 No. 7 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:11",
+            "port-speed": "SPEED_10GB"
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Slave port",
+                "enabled": true
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-7.2",
+        "config": {
+          "description": "QSFP28 No. 7 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:11",
+            "port-speed": "SPEED_10GB"
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Slave port",
+                "enabled": true
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-7.3",
+        "config": {
+          "description": "QSFP28 No. 7 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:11",
+            "port-speed": "SPEED_10GB"
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Slave port",
+                "enabled": true
+              }
+            }
+          ]
+        },
+        "state": {
+          "admin-status": "UP"
+        }
+      },
+      {
+        "name": "eth-7.4",
+        "config": {
+          "description": "QSFP28 No. 7 port with breakout mode capability",
+          "mtu": 9412
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:11",
+            "port-speed": "SPEED_10GB"
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 0,
+              "config": {
+                "description": "Slave port",
+                "enabled": true
               }
             }
           ]

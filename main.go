@@ -30,7 +30,6 @@ import (
 	"github.com/openconfig/ygot/ygot"
 
 	cfg "opennos-mgmt/config"
-	cmd "opennos-mgmt/config/command"
 )
 
 var validIfaces = [...]string{
@@ -99,20 +98,6 @@ type server struct {
 	*gnmi.Server
 }
 
-type transactionMngrT struct {
-	cmds [cfg.MaxNumberOfActionsInTransactionC]cmd.CommandI
-}
-
-func NewTransactionMngrT() *transactionMngrT {
-	var t transactionMngrT
-	var i cfg.OrdinalNumberT
-	for i = 0; i < cfg.MaxNumberOfActionsInTransactionC; i++ {
-		t.cmds[i] = &cmd.NilCmdT{}
-	}
-
-	return &t
-}
-
 var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cbUserData interface{}) error {
 	configMngr := cbUserData.(*cfg.ConfigMngrT)
 	changelog, err := configMngr.GetDiffRunningConfigWithCandidateConfig(&newConfig)
@@ -129,6 +114,7 @@ var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cb
 
 	log.Infof("Dump JSON: %s", string(jsonDump))
 	if len(changelog) > 0 {
+		defer configMngr.DiscardOrFinishTrans()
 		log.Infof("Configuration has been changed")
 		if err := configMngr.NewTransaction(); err != nil {
 			log.Errorf("Failed to start new transaction")
@@ -159,6 +145,11 @@ var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cb
 					log.Infof("Changing MTU to %d on port %s", changedItem.To, changedItem.Path[1])
 				}
 			}
+		}
+
+		if err := configMngr.Commit(); err != nil {
+			log.Errorf("Failed to commit changes")
+			return err
 		}
 
 		if err := configMngr.DiscardOrFinishTrans(); err != nil {

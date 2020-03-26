@@ -162,7 +162,7 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(change *diff.Cha
 }
 
 func (this *ConfigMngrT) appendSetPortBreakoutCmdToTransaction(ifname string, cmdToAdd *cmd.SetPortBreakoutCmdT) error {
-	setPortBreakoutCmds := this.cmdByIfname[SetPortBreakoutC]
+	setPortBreakoutCmds := this.cmdByIfname[setOrAddPortBreakoutC]
 	for _, setPortBreakoutCmd := range setPortBreakoutCmds {
 		if setPortBreakoutCmd.Equals(cmdToAdd) {
 			return fmt.Errorf("%q already exists in transaction", cmdToAdd.GetName())

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	lib "golibext"
 	"opennos-mgmt/gnmi/modeldata/oc"
@@ -105,151 +106,123 @@ func newConfigLookupTables() *configLookupTablesT {
 	}
 }
 
-func (t *configLookupTablesT) dump() {
-	log.Infoln("Dump internal state of config lookup tables")
-	log.Infoln("========================================")
-	intfs := make([]string, 0)
-	for ifname, _ := range t.idxByIntfName {
-		intfs = append(intfs, ifname)
-	}
-	sort.Strings(intfs)
-	log.Infof("There are %d LAG interfaces", len(intfs))
-	log.Infoln("Print list of interfaces:")
-	for _, ifname := range intfs {
-		log.Infoln(ifname)
+func (this *configLookupTablesT) checkDependenciesForDeleteOrRemoveEthIntfFromLagIntf(ifname string, lagName string) error {
+	intfIdx, exists := this.idxByIntfName[ifname]
+	if !exists {
+		return fmt.Errorf("Ethernet interface %s does not exists", ifname)
 	}
 
-	log.Infoln("========================================")
-	lags := make([]string, 0)
-	for lagName, _ := range t.idxByLagName {
-		lags = append(lags, lagName)
-	}
-	sort.Strings(lags)
-	log.Infof("There are %d LAG interfaces", len(lags))
-	log.Infoln("Print list of LAG interfaces:")
-	for _, lagName := range lags {
-		log.Infoln(lagName)
+	expectedLagIdx, exists := this.idxByLagName[lagName]
+	if !exists {
+		return fmt.Errorf("LAG %s does not exists", lagName)
 	}
 
-	log.Infoln("========================================")
-	log.Infoln("Print membership of interfaces in access VLAN:")
-	for _, ifname := range intfs {
-		if accessVid, exists := t.vlanAccessByIntf[t.idxByIntfName[ifname]]; exists {
-			log.Infof("Access VLAN on interface %s: %d", ifname, accessVid)
-		} else {
-			log.Infof("There isn't access VLAN on interface %s", ifname)
-			log.Infoln("----------------------------------------")
-			continue
-		}
+	if this.lagByIntf[intfIdx] != expectedLagIdx {
+		return fmt.Errorf("Ethernet interface %s does not exists in LAG %s", ifname, lagName)
 	}
 
-	log.Infoln("========================================")
-	log.Infoln("Print membership of interfaces in trunk VLANs:")
-	for _, ifname := range intfs {
-		idx := t.idxByIntfName[ifname]
-		vids, exists := t.vlanTrunkByIntf[idx]
-		if !exists {
-			log.Infof("There aren't any trunk VLANs on interface %s", ifname)
-			log.Infoln("----------------------------------------")
-			continue
-		}
+	return nil
+}
 
-		vlans := make([]int, 0)
-		for _, vid := range vids.VidTs() {
-			vlans = append(vlans, int(vid))
-		}
-		sort.Ints(vlans)
-		log.Infof("There are %d VLANs on interface %s:", len(vlans), ifname)
-		for _, vid := range vlans {
-			log.Infoln(vid)
-		}
+func (this *configLookupTablesT) checkDependenciesForDeleteOrRemoveLagIntf(lagName string) error {
+	var err error
+	strBuilder := strings.Builder{}
+	lagIdx, exists := this.idxByLagName[lagName]
+	if !exists {
+		return fmt.Errorf("LAG %s does not exists", lagName)
+	}
 
-		if nativeVid, exists := t.vlanNativeByIntf[idx]; exists {
-			log.Infof("Native VLAN on interface %s: %d", ifname, nativeVid)
+	if intfs, exists := this.intfByLag[lagIdx]; exists {
+		if intfs.Size() > 0 {
+			if _, err = strBuilder.WriteString("LAG members:"); err != nil {
+				return err
+			}
+
+			for _, intfIdx := range intfs.IdxTs() {
+				if _, err = strBuilder.WriteString(fmt.Sprintf(" %s", this.intfNameByIdx[intfIdx])); err != nil {
+					return err
+				}
+			}
+
+			if _, err = strBuilder.WriteString("\n"); err != nil {
+				return err
+			}
 		}
 	}
 
-	log.Infoln("========================================")
-	log.Infoln("Print membership of LAG in access VLAN:")
-	for _, lagName := range lags {
-		if accessVid, exists := t.vlanAccessByLag[t.idxByLagName[lagName]]; exists {
-			log.Infof("Access VLAN on LAG %s: %d", lagName, accessVid)
-		} else {
-			log.Infof("There isn't access VLAN on LAG %s", lagName)
-			log.Infoln("----------------------------------------")
-			continue
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
+func (this *configLookupTablesT) checkDependenciesForDeletePortBreakout(ifname string) error {
+	var err error
+	strBuilder := strings.Builder{}
+	intfIdx := this.idxByIntfName[ifname]
+	if allIpv4, exists := this.ipv4ByIntf[intfIdx]; exists {
+		for _, ip4 := range allIpv4.Strings() {
+			if _, err = strBuilder.WriteString("IPv4: " + ip4 + "\n"); err != nil {
+				return err
+			}
 		}
 	}
 
-	log.Infoln("========================================")
-	log.Infoln("Print membership of LAG interfaces in trunk VLANs:")
-	for _, lagName := range lags {
-		idx := t.idxByLagName[lagName]
-		vids, exists := t.vlanTrunkByLag[idx]
-		if !exists {
-			log.Infof("There aren't any trunk VLANs on LAG %s", lagName)
-			log.Infoln("----------------------------------------")
-			continue
-		}
-
-		vlans := make([]int, 0)
-		for _, vid := range vids.VidTs() {
-			vlans = append(vlans, int(vid))
-		}
-		sort.Ints(vlans)
-		log.Infof("There are %d VLANs on LAG %s:", len(vlans), lagName)
-		for _, vid := range vlans {
-			log.Infoln(vid)
-		}
-
-		if nativeVid, exists := t.vlanNativeByLag[idx]; exists {
-			log.Infof("Native VLAN on LAG %s: %d", lagName, nativeVid)
+	if allIpv6, exists := this.ipv6ByIntf[intfIdx]; exists {
+		for _, ip6 := range allIpv6.Strings() {
+			if _, err = strBuilder.WriteString("IPv6: " + ip6 + "\n"); err != nil {
+				return err
+			}
 		}
 	}
 
-	log.Infoln("========================================")
-	log.Infoln("Print IPv4 addresses on interfaces:")
-	for _, ifname := range intfs {
-		idx := t.idxByIntfName[ifname]
-		ipAddrs, exists := t.ipv4ByIntf[idx]
-		if !exists {
-			log.Infof("There aren't any IPv4 addresses on interface %s", ifname)
-			log.Infoln("----------------------------------------")
-			continue
-		}
-
-		addrs := make([]string, 0)
-		for _, ip := range ipAddrs.Strings() {
-			addrs = append(addrs, ip)
-		}
-		sort.Strings(addrs)
-		log.Infof("There are %d IPv4 addresses on interface %s:", len(addrs), ifname)
-		for _, ip := range addrs {
-			log.Infoln(ip)
+	if vid, exists := this.vlanAccessByIntf[intfIdx]; exists {
+		if _, err = strBuilder.WriteString(fmt.Sprintf("Access VLAN: %d\n", vid)); err != nil {
+			return err
 		}
 	}
 
-	log.Infoln("========================================")
-	log.Infoln("Print IPv6 addresses on interfaces:")
-	for _, ifname := range intfs {
-		idx := t.idxByIntfName[ifname]
-		ipAddrs, exists := t.ipv6ByIntf[idx]
-		if !exists {
-			log.Infof("There aren't any IPv6 addresses on interface %s", ifname)
-			log.Infoln("----------------------------------------")
-			continue
-		}
-
-		addrs := make([]string, 0)
-		for _, ip := range ipAddrs.Strings() {
-			addrs = append(addrs, ip)
-		}
-		sort.Strings(addrs)
-		log.Infof("There are %d IPv6 addresses on interface %s:", len(addrs), ifname)
-		for _, ip := range addrs {
-			log.Infoln(ip)
+	if vid, exists := this.vlanNativeByIntf[intfIdx]; exists {
+		if _, err = strBuilder.WriteString(fmt.Sprintf("Native VLAN: %d\n", vid)); err != nil {
+			return err
 		}
 	}
+
+	if trunkVlans, exists := this.vlanTrunkByIntf[intfIdx]; exists {
+		if trunkVlans.Size() > 0 {
+			vlans := trunkVlans.VidTs()
+			if _, err = strBuilder.WriteString("Trunk VLANs:"); err != nil {
+				return err
+			}
+
+			for _, vid := range vlans {
+				if _, err = strBuilder.WriteString(fmt.Sprintf(" %d", vid)); err != nil {
+					return err
+				}
+			}
+
+			if _, err = strBuilder.WriteString("\n"); err != nil {
+				return err
+			}
+		}
+	}
+
+	if lagIdx, exists := this.lagByIntf[intfIdx]; exists {
+		if _, err = strBuilder.WriteString(fmt.Sprintf("LAG: %s\n", this.lagNameByIdx[lagIdx])); err != nil {
+			return err
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
+func (this *configLookupTablesT) checkLagDependenciesDuringAdd(ifname string, lagName string) error {
+	return nil
 }
 
 func (table *configLookupTablesT) addNewInterfaceIfItDoesNotExist(ifname string) error {
@@ -578,4 +551,151 @@ func (t *configLookupTablesT) parseVlanForLagIntf(lagName string, swVlan *oc.Int
 	}
 
 	return nil
+}
+
+func (t *configLookupTablesT) dump() {
+	log.Infoln("Dump internal state of config lookup tables")
+	log.Infoln("========================================")
+	intfs := make([]string, 0)
+	for ifname, _ := range t.idxByIntfName {
+		intfs = append(intfs, ifname)
+	}
+	sort.Strings(intfs)
+	log.Infof("There are %d LAG interfaces", len(intfs))
+	log.Infoln("Print list of interfaces:")
+	for _, ifname := range intfs {
+		log.Infoln(ifname)
+	}
+
+	log.Infoln("========================================")
+	lags := make([]string, 0)
+	for lagName, _ := range t.idxByLagName {
+		lags = append(lags, lagName)
+	}
+	sort.Strings(lags)
+	log.Infof("There are %d LAG interfaces", len(lags))
+	log.Infoln("Print list of LAG interfaces:")
+	for _, lagName := range lags {
+		log.Infoln(lagName)
+	}
+
+	log.Infoln("========================================")
+	log.Infoln("Print membership of interfaces in access VLAN:")
+	for _, ifname := range intfs {
+		if accessVid, exists := t.vlanAccessByIntf[t.idxByIntfName[ifname]]; exists {
+			log.Infof("Access VLAN on interface %s: %d", ifname, accessVid)
+		} else {
+			log.Infof("There isn't access VLAN on interface %s", ifname)
+			log.Infoln("----------------------------------------")
+			continue
+		}
+	}
+
+	log.Infoln("========================================")
+	log.Infoln("Print membership of interfaces in trunk VLANs:")
+	for _, ifname := range intfs {
+		idx := t.idxByIntfName[ifname]
+		vids, exists := t.vlanTrunkByIntf[idx]
+		if !exists {
+			log.Infof("There aren't any trunk VLANs on interface %s", ifname)
+			log.Infoln("----------------------------------------")
+			continue
+		}
+
+		vlans := make([]int, 0)
+		for _, vid := range vids.VidTs() {
+			vlans = append(vlans, int(vid))
+		}
+		sort.Ints(vlans)
+		log.Infof("There are %d VLANs on interface %s:", len(vlans), ifname)
+		for _, vid := range vlans {
+			log.Infoln(vid)
+		}
+
+		if nativeVid, exists := t.vlanNativeByIntf[idx]; exists {
+			log.Infof("Native VLAN on interface %s: %d", ifname, nativeVid)
+		}
+	}
+
+	log.Infoln("========================================")
+	log.Infoln("Print membership of LAG in access VLAN:")
+	for _, lagName := range lags {
+		if accessVid, exists := t.vlanAccessByLag[t.idxByLagName[lagName]]; exists {
+			log.Infof("Access VLAN on LAG %s: %d", lagName, accessVid)
+		} else {
+			log.Infof("There isn't access VLAN on LAG %s", lagName)
+			log.Infoln("----------------------------------------")
+			continue
+		}
+	}
+
+	log.Infoln("========================================")
+	log.Infoln("Print membership of LAG interfaces in trunk VLANs:")
+	for _, lagName := range lags {
+		idx := t.idxByLagName[lagName]
+		vids, exists := t.vlanTrunkByLag[idx]
+		if !exists {
+			log.Infof("There aren't any trunk VLANs on LAG %s", lagName)
+			log.Infoln("----------------------------------------")
+			continue
+		}
+
+		vlans := make([]int, 0)
+		for _, vid := range vids.VidTs() {
+			vlans = append(vlans, int(vid))
+		}
+		sort.Ints(vlans)
+		log.Infof("There are %d VLANs on LAG %s:", len(vlans), lagName)
+		for _, vid := range vlans {
+			log.Infoln(vid)
+		}
+
+		if nativeVid, exists := t.vlanNativeByLag[idx]; exists {
+			log.Infof("Native VLAN on LAG %s: %d", lagName, nativeVid)
+		}
+	}
+
+	log.Infoln("========================================")
+	log.Infoln("Print IPv4 addresses on interfaces:")
+	for _, ifname := range intfs {
+		idx := t.idxByIntfName[ifname]
+		ipAddrs, exists := t.ipv4ByIntf[idx]
+		if !exists {
+			log.Infof("There aren't any IPv4 addresses on interface %s", ifname)
+			log.Infoln("----------------------------------------")
+			continue
+		}
+
+		addrs := make([]string, 0)
+		for _, ip := range ipAddrs.Strings() {
+			addrs = append(addrs, ip)
+		}
+		sort.Strings(addrs)
+		log.Infof("There are %d IPv4 addresses on interface %s:", len(addrs), ifname)
+		for _, ip := range addrs {
+			log.Infoln(ip)
+		}
+	}
+
+	log.Infoln("========================================")
+	log.Infoln("Print IPv6 addresses on interfaces:")
+	for _, ifname := range intfs {
+		idx := t.idxByIntfName[ifname]
+		ipAddrs, exists := t.ipv6ByIntf[idx]
+		if !exists {
+			log.Infof("There aren't any IPv6 addresses on interface %s", ifname)
+			log.Infoln("----------------------------------------")
+			continue
+		}
+
+		addrs := make([]string, 0)
+		for _, ip := range ipAddrs.Strings() {
+			addrs = append(addrs, ip)
+		}
+		sort.Strings(addrs)
+		log.Infof("There are %d IPv6 addresses on interface %s:", len(addrs), ifname)
+		for _, ip := range addrs {
+			log.Infoln(ip)
+		}
+	}
 }

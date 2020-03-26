@@ -23,39 +23,42 @@ type OrdinalNumberT uint16
 
 // The following constants define ordering numbers of actions in transaction
 const (
-	UnorderedActionInTransactionC    OrdinalNumberT = iota
-	WithdrawIpv4FromEthIntfC                        // Remove IPv4/CIDRv4 address from Ethernet interface
-	WithdrawIpv4FromLagIntfC                        // Remove IPv4/CIDRv4 address from LAG interface
-	WithdrawIpv6FromEthIntfC                        // Remove IPv6/CIDRv6 address from Ethernet interface
-	WithdrawIpv6FromLagIntfC                        // Remove IPv6/CIDRv6 address from LAG interface
-	WithdrawEthIntfFromAccessVlanC                  // Remove Ethernet interface from access VLAN
-	WithdrawLagIntfFromAccessVlanC                  // Remove LAG interface from access VLAN
-	WithdrawEthIntfFromNativeVlanC                  // Remove Ethernet interface from native VLAN
-	WithdrawFromLagIntfNativeVlanC                  // Remove LAG interface from native VLAN
-	WithdrawEthIntfFromTrunkVlanC                   // Remove Ethernet interface from trunk VLAN
-	WithdrawLagIntfFromTrunkVlanC                   // Remove LAG interface from trunk VLAN
-	WithdrawPortBreakoutC                           // Combine multiple logical ports into single port
-	SetPortBreakoutC                                // Break out front panel port into multiple logical ports
-	SetPortBreakoutSpeedC                           // Set speed on logical ports (lanes)
-	SetDescOnEthIntfC                               // Set description of Ethernet interface
-	SetPortAutoNegOnEthIntfC                        // Enable or disable auto-negotiation on port
-	SetPortMtuOnEthIntfC                            // Set MTU on port
-	SetPortSpeedOnEthIntfC                          // Set port speed
-	SetIpv4OnEthIntfC                               // Assign IPv4/CIDRv4 address to Ethernet interface
-	SetIpv4OnLagIntfC                               // Assign IPv4/CIDRv4 address to LAG interface
-	SetIpv6OnEthIntfC                               // Assign IPv6/CIDRv6 address to Ethernet interface
-	SetIpv6OnLagIntfC                               // Assign IPv6/CIDRv6 address to LAG interface
-	SetVlanIntfModeOfLagIntfC                       // Set VLAN interface mode
-	SetAccessVlanOnEthIntfC                         // Assign Ethernet interface to access VLAN
-	SetAccessVlanOnLagIntfC                         // Assign LAG interface to access VLAN
-	SetNativeVlanOnEthIntfC                         // Assign Ethernet interface to native VLAN
-	SetNativeVlanOnLagIntfC                         // Assign LAG interface to native VLAN
-	SetTrunkVlanOnEthIntfC                          // Assign Ethernet interface to trunk VLAN
-	SetTrunkVlanOnLagIntfC                          // Assign LAG interface to trunk VLAN
-	SetLagTypeOfLagIntfC                            // Set the type of LAG
-	SetLacpIntervalC                                // Set the period between LACP messages
-	SetLacpModeC                                    // Set LACP activity - active or passive
-	MaxNumberOfActionsInTransactionC                // Defines maximum number of possible actions in transaction
+	unorderedActionInTransactionC        OrdinalNumberT = iota
+	deleteOrRemoveIpv4FromEthIntfC                      // Remove IPv4/CIDRv4 address from Ethernet interface
+	deleteOrRemoveIpv4FromLagIntfC                      // Remove IPv4/CIDRv4 address from LAG interface
+	deleteOrRemoveIpv6FromEthIntfC                      // Remove IPv6/CIDRv6 address from Ethernet interface
+	deleteOrRemoveIpv6FromLagIntfC                      // Remove IPv6/CIDRv6 address from LAG interface
+	deleteOrRemoveEthIntfFromAccessVlanC                // Remove Ethernet interface from access VLAN
+	deleteOrRemoveLagIntfFromAccessVlanC                // Remove LAG interface from access VLAN
+	deleteOrRemoveEthIntfFromNativeVlanC                // Remove Ethernet interface from native VLAN
+	deleteOrRemoveLagIntfFromNativeVlanC                // Remove LAG interface from native VLAN
+	deleteOrRemoveEthIntfFromTrunkVlanC                 // Remove Ethernet interface from trunk VLAN
+	deleteOrRemoveLagIntfFromTrunkVlanC                 // Remove LAG interface from trunk VLAN
+	deleteOrRemoveEthIntfFromLagIntfC                   // Remove Ethernet interface from LAG membership
+	deleteOrRemoveLagIntfC                              // Delete LAG interface
+	deleteOrRemovePortBreakoutC                         // Combine multiple logical ports into single port
+	setOrAddPortBreakoutC                               // Break out front panel port into multiple logical ports
+	setOrAddPortBreakoutSpeedC                          // Set speed on logical ports (lanes)
+	setOrAddDescOnEthIntfC                              // Set description of Ethernet interface
+	setOrAddPortAutoNegOnEthIntfC                       // Enable or disable auto-negotiation on port
+	setOrAddPortMtuOnEthIntfC                           // Set MTU on port
+	setOrAddPortSpeedOnEthIntfC                         // Set port speed
+	setOrAddLagIntfC                                    // Add LAG interface
+	setOrAddIpv4OnEthIntfC                              // Assign IPv4/CIDRv4 address to Ethernet interface
+	setOrAddIpv4OnLagIntfC                              // Assign IPv4/CIDRv4 address to LAG interface
+	setOrAddIpv6OnEthIntfC                              // Assign IPv6/CIDRv6 address to Ethernet interface
+	setOrAddIpv6OnLagIntfC                              // Assign IPv6/CIDRv6 address to LAG interface
+	setOrAddVlanIntfModeOfLagIntfC                      // Set VLAN interface mode
+	setOrAddAccessVlanOnEthIntfC                        // Assign Ethernet interface to access VLAN
+	setOrAddAccessVlanOnLagIntfC                        // Assign LAG interface to access VLAN
+	setOrAddNativeVlanOnEthIntfC                        // Assign Ethernet interface to native VLAN
+	setOrAddNativeVlanOnLagIntfC                        // Assign LAG interface to native VLAN
+	setOrAddTrunkVlanOnEthIntfC                         // Assign Ethernet interface to trunk VLAN
+	setOrAddTrunkVlanOnLagIntfC                         // Assign LAG interface to trunk VLAN
+	setOrAddLagTypeOfLagIntfC                           // Set the type of LAG
+	setOrAddLacpIntervalC                               // Set the period between LACP messages
+	setOrAddLacpModeC                                   // Set LACP activity - active or passive
+	maxNumberOfActionsInTransactionC                    // Defines maximum number of possible actions in transaction
 )
 
 const (
@@ -77,10 +80,10 @@ type cmdByIfnameT map[string]cmd.CommandI
 type ConfigMngrT struct {
 	configLookupTbl         *configLookupTablesT
 	runningConfig           ygot.ValidatedGoStruct
-	cmdByIfname             [MaxNumberOfActionsInTransactionC]cmdByIfnameT
+	cmdByIfname             [maxNumberOfActionsInTransactionC]cmdByIfnameT
 	ethSwitchMgmtClientConn *grpc.ClientConn
 	ethSwitchMgmtClient     *mgmt.EthSwitchMgmtClient
-	// transactions    [TransactionIdx][MaxNumberOfActionsInTransactionC]cmdByIfnameT
+	// transactions    [TransactionIdx][maxNumberOfActionsInTransactionC]cmdByIfnameT
 	// transConfigLookupTbl every queued command should remove dependency from here
 	// e.g. when LAG is going to be remove, we should remove ports from this LAG, and LAG itself
 	transConfigLookupTbl *configLookupTablesT
@@ -106,7 +109,7 @@ func (this *ConfigMngrT) NewTransaction() error {
 	ethSwitchMgmtClient := mgmt.NewEthSwitchMgmtClient(conn)
 	nilCmd := &cmd.NilCmdT{}
 	var i OrdinalNumberT
-	for i = 0; i < MaxNumberOfActionsInTransactionC; i++ {
+	for i = 0; i < maxNumberOfActionsInTransactionC; i++ {
 		this.cmdByIfname[i] = make(cmdByIfnameT, 1)
 		this.cmdByIfname[i][nilCmd.GetName()] = nilCmd
 	}
@@ -125,8 +128,9 @@ func (this *ConfigMngrT) Commit() error {
 	}
 
 	var i OrdinalNumberT
-	for i = 0; i < MaxNumberOfActionsInTransactionC; i++ {
+	for i = 0; i < maxNumberOfActionsInTransactionC; i++ {
 		for _, command := range this.cmdByIfname[i] {
+			log.Infof("Execute command %q", command.GetName())
 			if err := command.Execute(); err != nil {
 				for i > 0 {
 					i--
@@ -146,12 +150,12 @@ func (this *ConfigMngrT) Rollback() error {
 		return errors.New("Transaction not has been started")
 	}
 
-	i := MaxNumberOfActionsInTransactionC
+	i := maxNumberOfActionsInTransactionC
 	for i > 0 {
 		i--
 		for _, command := range this.cmdByIfname[i] {
 			if err := command.Undo(); err != nil {
-				for i < MaxNumberOfActionsInTransactionC {
+				for i < maxNumberOfActionsInTransactionC {
 					i++
 					command.Execute()
 				}
@@ -342,31 +346,22 @@ func (this *ConfigMngrT) ValidatePortBreakoutChanging(changedItem *diff.Change, 
 		return fmt.Errorf("Unable to get port breakout changing")
 	}
 
-	log.Infof("Requested changing port %s breakout into %d mode with speed %d", ifname, numChannels, channelSpeed)
+	log.Infof("Requested changing port %s breakout into mode %d with speed %d", ifname, numChannels, channelSpeed)
 	setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem, channelSpeedChangeItem, this.ethSwitchMgmtClient)
 	if numChannels == cmd.PortBreakoutModeNoneC {
-		// Check if there won't be any dependencies from slave port
-		slavePorts := make([]string, cmd.PortBreakoutMode4xC)
 		for i := 1; i <= 4; i++ {
-			slavePorts[i-1] = fmt.Sprintf("%s.%d", ifname, i)
-			log.Infof("Composed slave port: %s", slavePorts[i-1])
-			slaveIfname := slavePorts[i-1]
-			idx := this.transConfigLookupTbl.idxByIntfName[slaveIfname]
-			// TODO: Go through by all dependencies like ther ordinal number
-			if ip4, exists := this.transConfigLookupTbl.ipv4ByIntf[idx]; exists {
-				return fmt.Errorf("Cannot %q because there is dependency from IPv4 %s", setPortBreakoutCmd.GetName(), ip4.Strings()[0])
+			slavePort := fmt.Sprintf("%s.%d", ifname, i)
+			log.Infof("Composed slave port: %s", slavePort)
+			if err := this.configLookupTbl.checkDependenciesForDeletePortBreakout(slavePort); err != nil {
+				return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
+					setPortBreakoutCmd.GetName(), slavePort, err)
 			}
 		}
 	} else {
-		// Check if there won't be any dependenies from master ports
-	}
-
-	// TODO: Remove this code: Execute/Undo
-	if err = setPortBreakoutCmd.Execute(); err != nil {
-		return fmt.Errorf("Failed to execute set port breakout request: %s", err)
-	}
-	if err = setPortBreakoutCmd.Undo(); err != nil {
-		return fmt.Errorf("Failed to withdraw port breakout request: %s", err)
+		if err := this.configLookupTbl.checkDependenciesForDeletePortBreakout(ifname); err != nil {
+			return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
+				setPortBreakoutCmd.GetName(), ifname, err)
+		}
 	}
 
 	if this.transHasBeenStarted {
