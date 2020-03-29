@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	mgmt "opennos-eth-switch-service/mgmt"
+	"opennos-eth-switch-service/mgmt/platform"
 	"opennos-mgmt/gnmi/modeldata/oc"
 	"time"
 
@@ -69,6 +70,7 @@ func (this *SetPortBreakoutCmdT) GetName() string {
 	return this.name
 }
 
+// Equals checks if 'this' command and 'other' command are the same... do the same thing
 func (this *SetPortBreakoutCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*SetPortBreakoutCmdT)
 	return this.equals(otherCmd.commandT)
@@ -82,7 +84,7 @@ type deletePortBreakoutCmdT struct {
 }
 
 // NewSetPortBreakoutCmdT create new instance of deletePortBreakoutCmdT type
-func NewdeletePortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *deletePortBreakoutCmdT {
+func NewDeletePortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *deletePortBreakoutCmdT {
 	changes := make([]*diff.Change, maxChangeIdxC)
 	changes[numChannelsChangeIdxC] = numChansChg
 	changes[channelSpeedChangeIdxC] = chanSpeedChg
@@ -110,9 +112,43 @@ func (this *deletePortBreakoutCmdT) GetName() string {
 	return this.name
 }
 
-// SetPortBreakoutSpeedCmdT implements command for change speed onto multiple logical ports
-type SetPortBreakoutSpeedCmdT struct {
+// SetPortBreakoutChanSpeedCmdT implements command for change speed onto all sub-ports
+type SetPortBreakoutChanSpeedCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
+}
+
+// NewSetPortBreakoutCmdT create new instance of SetPortBreakoutChanSpeedCmdT type
+func NewSetPortBreakoutChanSpeedCmdT(change *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetPortBreakoutChanSpeedCmdT {
+	changes := make([]*diff.Change, maxChangeIdxC)
+	changes[channelSpeedChangeIdxC] = change
+	return &SetPortBreakoutChanSpeedCmdT{
+		commandT: newCommandT("set port breakout channel speed", changes, ethSwitchMgmt),
+	}
+}
+
+// Execute implements the same method from CommandI interface and set channel speed of all
+// sub-ports
+func (this *SetPortBreakoutChanSpeedCmdT) Execute() error {
+	shouldBeAbleOnlyToUndo := false
+	return this.doPortBreakoutChanSpeedCmd(shouldBeAbleOnlyToUndo)
+}
+
+// Undo implements the same method from CommandI interface and withdraws changes performed by
+// previously execution of Execute() method
+func (this *SetPortBreakoutChanSpeedCmdT) Undo() error {
+	shouldBeAbleOnlyToUndo := true
+	return this.doPortBreakoutChanSpeedCmd(shouldBeAbleOnlyToUndo)
+}
+
+// GetName implements the same method from CommandI interface and returns name of command
+func (this *SetPortBreakoutChanSpeedCmdT) GetName() string {
+	return this.name
+}
+
+// Equals checks if 'this' command and 'other' command are the same... do the same thing
+func (this *SetPortBreakoutChanSpeedCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*SetPortBreakoutChanSpeedCmdT)
+	return this.equals(otherCmd.commandT)
 }
 
 // No exported section
@@ -141,10 +177,35 @@ func (this *commandT) doPortBreakoutCmd(shouldBeAbleOnlyToUndo bool) error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	_, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &mgmt.PortBreakoutRequest{
+	_, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
 		Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
 		NumChannels:  numChannels,
-		ChannelSpeed: channelSpeed,
+		ChannelSpeed: &channelSpeed,
+	})
+	if err != nil {
+		return err
+	}
+
+	this.finalize()
+	return nil
+}
+
+func (this *commandT) doPortBreakoutChanSpeedCmd(shouldBeAbleOnlyToUndo bool) error {
+	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return this.createErrorAccordingToExecutionState()
+	}
+
+	this.dumpInternalData()
+	channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	_, err = (*this.ethSwitchMgmt).SetPortBreakoutChanSpeed(ctx, &mgmt.PortBreakoutChanSpeedRequest{
+		Ifname:       this.changes[channelSpeedChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
+		ChannelSpeed: &channelSpeed,
 	})
 	if err != nil {
 		return err
@@ -168,16 +229,17 @@ func convertOcNumChanIntoMgmtPortBreakoutReq(numChannels PortBreakoutModeT) (mgm
 	return mode, nil
 }
 
-func convertOcChanSpeedIntoMgmtPortBreakoutReq(chanSpeed oc.E_OpenconfigIfEthernet_ETHERNET_SPEED) (mgmt.PortBreakoutRequest_ChannelSpeed, error) {
-	var speed mgmt.PortBreakoutRequest_ChannelSpeed
+func convertOcChanSpeedIntoMgmtPortBreakoutReq(chanSpeed oc.E_OpenconfigIfEthernet_ETHERNET_SPEED) (mgmt.ChannelSpeed, error) {
+	var err error = nil
+	var speed mgmt.ChannelSpeed_Mode
 	switch chanSpeed {
 	case oc.OpenconfigIfEthernet_ETHERNET_SPEED_SPEED_10GB:
-		speed = mgmt.PortBreakoutRequest_SPEED_10GB
+		speed = mgmt.ChannelSpeed_SPEED_10GB
 	case oc.OpenconfigIfEthernet_ETHERNET_SPEED_SPEED_100GB:
-		speed = mgmt.PortBreakoutRequest_SPEED_100GB
+		speed = mgmt.ChannelSpeed_SPEED_100GB
 	default:
-		return 0, fmt.Errorf("Failed to convert OC channel speed (%d) into request of management port breakout", chanSpeed)
+		err = fmt.Errorf("Failed to convert OC channel speed (%d) into request of management port breakout", chanSpeed)
 	}
 
-	return speed, nil
+	return mgmt.ChannelSpeed{Mode: speed}, err
 }

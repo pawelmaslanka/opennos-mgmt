@@ -114,23 +114,29 @@ var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cb
 
 	log.Infof("Dump JSON: %s", string(jsonDump))
 	if len(changelog) > 0 {
+		diffChangelog := cfg.NewDiffChangelogMgmtT(&changelog)
 		defer configMngr.DiscardOrFinishTrans()
 		log.Infof("Configuration has been changed")
 		if err := configMngr.NewTransaction(); err != nil {
 			log.Errorf("Failed to start new transaction")
 			return err
 		}
-		for _, changedItem := range changelog {
-			log.Infof("Change item: %#v", changedItem)
-			if len(changedItem.Path) > 4 {
-				if configMngr.IsChangedPortBreakout(&changedItem) {
-					if err := configMngr.ValidatePortBreakoutChanging(&changedItem, &changelog); err != nil {
+		for _, changedItem := range diffChangelog.Changes {
+			log.Infof("Change item: %#v", changedItem.Change)
+			log.Infof("Already processed: %#v", changedItem.IsProcessed())
+			if changedItem.IsProcessed() {
+				log.Infoln("Change is already processed")
+				continue
+			}
+			if len(changedItem.Change.Path) > 4 {
+				if configMngr.IsChangedPortBreakout(changedItem.Change) {
+					if err := configMngr.ValidatePortBreakoutChanging(changedItem, diffChangelog); err != nil {
 						log.Errorf("%s", err)
 						return err
 					}
-				} else if "NativeVlan" == changedItem.Path[4] {
+				} else if "NativeVlan" == changedItem.Change.Path[4] {
 					port := make([]string, 1)
-					port[0] = changedItem.Path[1]
+					port[0] = changedItem.Change.Path[1]
 					// TODO: Uncomment if build is dedicated for target device
 					// if err := vlan.SetNativeVlan(port, changedItem.To.(uint16)); err != nil {
 					// 	log.Errorf("Failed to set native VLAN")
@@ -138,11 +144,11 @@ var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cb
 					// }
 
 					log.Infof("Native VLAN has been changed to %d on port %s",
-						changedItem.To, changedItem.Path[1])
+						changedItem.Change.To, changedItem.Change.Path[1])
 				}
-			} else if len(changedItem.Path) > 2 {
-				if "Mtu" == changedItem.Path[2] {
-					log.Infof("Changing MTU to %d on port %s", changedItem.To, changedItem.Path[1])
+			} else if len(changedItem.Change.Path) > 2 {
+				if "Mtu" == changedItem.Change.Path[2] {
+					log.Infof("Changing MTU to %d on port %s", changedItem.Change.To, changedItem.Change.Path[1])
 				}
 			}
 		}

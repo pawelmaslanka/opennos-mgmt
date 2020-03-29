@@ -298,25 +298,25 @@ func (this *ConfigMngrT) IsIntfAvailable(ifname string) bool {
 	return false
 }
 
-func (this *ConfigMngrT) ValidatePortBreakoutChanging(changedItem *diff.Change, changelog *diff.Changelog) error {
-	ifname := changedItem.Path[cmd.PortBreakoutIfnamePathItemIdxC]
+func (this *ConfigMngrT) ValidatePortBreakoutChanging(changedItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+	ifname := changedItem.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
 	if !this.IsIntfAvailable(ifname) {
 		return fmt.Errorf("Port %s is unrecognized", ifname)
 	}
 
 	var numChannels cmd.PortBreakoutModeT = cmd.PortBreakoutModeInvalidC
 	var channelSpeed oc.E_OpenconfigIfEthernet_ETHERNET_SPEED = oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
-	var numChannelsChangeItem *diff.Change
-	var channelSpeedChangeItem *diff.Change
+	var numChannelsChangeItem *DiffChangeMgmtT
+	var channelSpeedChangeItem *DiffChangeMgmtT
 	var err error
 
-	if changedItem.Path[cmd.PortBreakoutNumChanPathItemIdxC] == cmd.PortBreakoutNumChanPathItemC {
+	if changedItem.Change.Path[cmd.PortBreakoutNumChanPathItemIdxC] == cmd.PortBreakoutNumChanPathItemC {
 		channelSpeed, err = this.getPortBreakoutChannelSpeedFromChangelog(ifname, changelog)
 		if err != nil {
 			return err
 		}
 
-		numChannels = cmd.PortBreakoutModeT(changedItem.To.(uint8))
+		numChannels = cmd.PortBreakoutModeT(changedItem.Change.To.(uint8))
 		if !this.isValidPortBreakoutNumChannels(numChannels) {
 			return fmt.Errorf("Number of channels (%d) to breakout is invalid", numChannels)
 		}
@@ -326,13 +326,13 @@ func (this *ConfigMngrT) ValidatePortBreakoutChanging(changedItem *diff.Change, 
 			return err
 		}
 		numChannelsChangeItem = changedItem
-	} else if changedItem.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] == cmd.PortBreakoutChanSpeedPathItemC {
+	} else if changedItem.Change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] == cmd.PortBreakoutChanSpeedPathItemC {
 		numChannels, err = this.getPortBreakoutNumChannelsFromChangelog(ifname, changelog)
 		if err != nil {
 			return this.validatePortBreakoutChannSpeedChanging(changedItem, changelog)
 		}
 
-		channelSpeed = changedItem.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
+		channelSpeed = changedItem.Change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
 		if !this.isValidPortBreakoutChannelSpeed(numChannels, channelSpeed) {
 			return fmt.Errorf("Speed channel (%d) is invalid", channelSpeed)
 		}
@@ -347,7 +347,7 @@ func (this *ConfigMngrT) ValidatePortBreakoutChanging(changedItem *diff.Change, 
 	}
 
 	log.Infof("Requested changing port %s breakout into mode %d with speed %d", ifname, numChannels, channelSpeed)
-	setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem, channelSpeedChangeItem, this.ethSwitchMgmtClient)
+	setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
 	if numChannels == cmd.PortBreakoutModeNoneC {
 		for i := 1; i <= 4; i++ {
 			slavePort := fmt.Sprintf("%s.%d", ifname, i)
@@ -365,8 +365,13 @@ func (this *ConfigMngrT) ValidatePortBreakoutChanging(changedItem *diff.Change, 
 	}
 
 	if this.transHasBeenStarted {
-		setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem, channelSpeedChangeItem, this.ethSwitchMgmtClient)
-		return this.appendSetPortBreakoutCmdToTransaction(ifname, setPortBreakoutCmd)
+		setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
+		if err = this.appendSetPortBreakoutCmdToTransaction(ifname, setPortBreakoutCmd); err != nil {
+			return err
+		}
+
+		numChannelsChangeItem.MarkAsProcessed()
+		channelSpeedChangeItem.MarkAsProcessed()
 	}
 
 	return nil

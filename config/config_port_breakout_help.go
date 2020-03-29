@@ -9,14 +9,14 @@ import (
 	"github.com/r3labs/diff"
 )
 
-func (this *ConfigMngrT) getPortBreakoutChannelSpeedFromChangelog(ifname string, changelog *diff.Changelog) (oc.E_OpenconfigIfEthernet_ETHERNET_SPEED, error) {
+func (this *ConfigMngrT) getPortBreakoutChannelSpeedFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (oc.E_OpenconfigIfEthernet_ETHERNET_SPEED, error) {
 	var err error = nil
 	channelSpeed := oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
-	for _, change := range *changelog {
-		if this.isChangedPortBreakoutChannelSpeed(&change) {
-			log.Infof("Found channel speed request too:\n%+v", change)
-			if change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
-				channelSpeed = change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
+	for _, changedItem := range changelog.Changes {
+		if this.isChangedPortBreakoutChannelSpeed(changedItem.Change) {
+			log.Infof("Found channel speed request too:\n%+v", *changedItem)
+			if changedItem.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
+				channelSpeed = changedItem.Change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
 				break
 			}
 		}
@@ -29,16 +29,16 @@ func (this *ConfigMngrT) getPortBreakoutChannelSpeedFromChangelog(ifname string,
 	return channelSpeed, err
 }
 
-func (this *ConfigMngrT) getPortBreakoutChannelSpeedChangeItemFromChangelog(ifname string, changelog *diff.Changelog) (*diff.Change, error) {
+func (this *ConfigMngrT) getPortBreakoutChannelSpeedChangeItemFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, error) {
 	var err error = nil
-	var changeItem *diff.Change
+	var changeItem *DiffChangeMgmtT
 	channelSpeed := oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
-	for _, change := range *changelog {
-		if this.isChangedPortBreakoutChannelSpeed(&change) {
-			log.Infof("Found channel speed request too:\n%+v", change)
-			if change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
-				channelSpeed = change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
-				changeItem = &change
+	for _, ch := range changelog.Changes {
+		if this.isChangedPortBreakoutChannelSpeed(ch.Change) {
+			log.Infof("Found channel speed request too:\n%+v", ch)
+			if ch.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
+				channelSpeed = ch.Change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
+				changeItem = ch
 				break
 			}
 		}
@@ -102,14 +102,14 @@ func (this *ConfigMngrT) isValidPortBreakoutChannelSpeed(numChannels cmd.PortBre
 	return false
 }
 
-func (this *ConfigMngrT) getPortBreakoutNumChannelsFromChangelog(ifname string, changelog *diff.Changelog) (cmd.PortBreakoutModeT, error) {
+func (this *ConfigMngrT) getPortBreakoutNumChannelsFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (cmd.PortBreakoutModeT, error) {
 	var err error = nil
 	numChannels := cmd.PortBreakoutModeInvalidC
-	for _, change := range *changelog {
-		if this.isChangedPortBreakoutNumChannels(&change) {
-			log.Infof("Found changing number of channels request too:\n%+v", change)
-			if change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
-				numChannels = cmd.PortBreakoutModeT(change.To.(uint8))
+	for _, ch := range changelog.Changes {
+		if this.isChangedPortBreakoutNumChannels(ch.Change) {
+			log.Infof("Found changing number of channels request too:\n%+v", ch.Change)
+			if ch.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
+				numChannels = cmd.PortBreakoutModeT(ch.Change.To.(uint8))
 				break
 			}
 		}
@@ -122,16 +122,16 @@ func (this *ConfigMngrT) getPortBreakoutNumChannelsFromChangelog(ifname string, 
 	return numChannels, err
 }
 
-func (this *ConfigMngrT) getPortBreakoutNumChannelsChangeItemFromChangelog(ifname string, changelog *diff.Changelog) (*diff.Change, error) {
+func (this *ConfigMngrT) getPortBreakoutNumChannelsChangeItemFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, error) {
 	var err error = nil
-	var changeItem *diff.Change
+	var changeItem *DiffChangeMgmtT
 	numChannels := cmd.PortBreakoutModeInvalidC
-	for _, change := range *changelog {
-		if this.isChangedPortBreakoutNumChannels(&change) {
-			log.Infof("Found changing number of channels request too:\n%+v", change)
-			if change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
-				numChannels = cmd.PortBreakoutModeT(change.To.(uint8))
-				changeItem = &change
+	for _, ch := range changelog.Changes {
+		if this.isChangedPortBreakoutNumChannels(ch.Change) {
+			log.Infof("Found changing number of channels request too:\n%+v", ch.Change)
+			if ch.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC] == ifname {
+				numChannels = cmd.PortBreakoutModeT(ch.Change.To.(uint8))
+				changeItem = ch
 				break
 			}
 		}
@@ -144,8 +144,8 @@ func (this *ConfigMngrT) getPortBreakoutNumChannelsChangeItemFromChangelog(ifnam
 	return changeItem, err
 }
 
-func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(change *diff.Change, changelog *diff.Changelog) error {
-	ifname := change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
+func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(change *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+	ifname := change.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
 	log.Infof("Requested changing of channel speed on subports of port %s", ifname)
 	device := this.runningConfig.(*oc.Device)
 	numChannels := device.GetComponent(ifname).GetPort().GetBreakoutMode().GetNumChannels()
@@ -154,8 +154,16 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(change *diff.Cha
 		return fmt.Errorf("Unable change channel speed if port %s is not splitted", ifname)
 	}
 
-	if !this.isValidPortBreakoutChannelSpeed(mode, change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)) {
-		return fmt.Errorf("Requested channel speed (%d) on subports of port %s is invalid", change.To, ifname)
+	chanSpeed := change.Change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
+	if !this.isValidPortBreakoutChannelSpeed(mode, chanSpeed) {
+		return fmt.Errorf("Requested channel speed (%d) on subports of port %s is invalid", chanSpeed, ifname)
+	}
+
+	if this.transHasBeenStarted {
+		change.MarkAsProcessed()
+		// TODO: Uncomment after implement SetPortBreakoutChannSpeedReq
+		// setPortBreakoutCmd := cmd.NewSetPortBreakoutChanSpeedCmdT(channelSpeedChangeItem, this.ethSwitchMgmtClient)
+		// return this.appendSetPortBreakoutCmdToTransaction(ifname, setPortBreakoutCmd)
 	}
 
 	return nil
@@ -165,9 +173,11 @@ func (this *ConfigMngrT) appendSetPortBreakoutCmdToTransaction(ifname string, cm
 	setPortBreakoutCmds := this.cmdByIfname[setOrAddPortBreakoutC]
 	for _, setPortBreakoutCmd := range setPortBreakoutCmds {
 		if setPortBreakoutCmd.Equals(cmdToAdd) {
-			return fmt.Errorf("%q already exists in transaction", cmdToAdd.GetName())
+			return fmt.Errorf("Command %q already exists in transaction", cmdToAdd.GetName())
 		}
 	}
+
+	log.Infof("Append command %q to transaction", cmdToAdd.GetName())
 
 	setPortBreakoutCmds[ifname] = cmdToAdd
 	return nil
