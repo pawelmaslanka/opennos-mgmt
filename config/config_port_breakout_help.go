@@ -144,8 +144,8 @@ func (this *ConfigMngrT) getPortBreakoutNumChannelsChangeItemFromChangelog(ifnam
 	return changeItem, err
 }
 
-func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(change *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
-	ifname := change.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
+func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(ch *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+	ifname := ch.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
 	log.Infof("Requested changing of channel speed on subports of port %s", ifname)
 	device := this.runningConfig.(*oc.Device)
 	numChannels := device.GetComponent(ifname).GetPort().GetBreakoutMode().GetNumChannels()
@@ -154,16 +154,18 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(change *DiffChan
 		return fmt.Errorf("Unable change channel speed if port %s is not splitted", ifname)
 	}
 
-	chanSpeed := change.Change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
+	chanSpeed := ch.Change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
 	if !this.isValidPortBreakoutChannelSpeed(mode, chanSpeed) {
 		return fmt.Errorf("Requested channel speed (%d) on subports of port %s is invalid", chanSpeed, ifname)
 	}
 
 	if this.transHasBeenStarted {
-		change.MarkAsProcessed()
-		// TODO: Uncomment after implement SetPortBreakoutChannSpeedReq
-		// setPortBreakoutCmd := cmd.NewSetPortBreakoutChanSpeedCmdT(channelSpeedChangeItem, this.ethSwitchMgmtClient)
-		// return this.appendSetPortBreakoutCmdToTransaction(ifname, setPortBreakoutCmd)
+		setPortBreakoutChanSpeedCmd := cmd.NewSetPortBreakoutChanSpeedCmdT(ch.Change, this.ethSwitchMgmtClient)
+		if err := this.appendSetPortBreakoutChanSpeedCmdToTransaction(ifname, setPortBreakoutChanSpeedCmd); err != nil {
+			return err
+		}
+
+		ch.MarkAsProcessed()
 	}
 
 	return nil
@@ -180,5 +182,19 @@ func (this *ConfigMngrT) appendSetPortBreakoutCmdToTransaction(ifname string, cm
 	log.Infof("Append command %q to transaction", cmdToAdd.GetName())
 
 	setPortBreakoutCmds[ifname] = cmdToAdd
+	return nil
+}
+
+func (this *ConfigMngrT) appendSetPortBreakoutChanSpeedCmdToTransaction(ifname string, cmdToAdd *cmd.SetPortBreakoutChanSpeedCmdT) error {
+	setPortBreakoutChanSpeedCmds := this.cmdByIfname[setOrAddPortBreakoutChanSpeedC]
+	for _, setPortBreakoutChanSpeedCmd := range setPortBreakoutChanSpeedCmds {
+		if setPortBreakoutChanSpeedCmd.Equals(cmdToAdd) {
+			return fmt.Errorf("Command %q already exists in transaction", cmdToAdd.GetName())
+		}
+	}
+
+	log.Infof("Append command %q to transaction", cmdToAdd.GetName())
+
+	setPortBreakoutChanSpeedCmds[ifname] = cmdToAdd
 	return nil
 }

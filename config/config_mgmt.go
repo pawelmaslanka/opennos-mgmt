@@ -38,7 +38,7 @@ const (
 	deleteOrRemoveLagIntfC                              // Delete LAG interface
 	deleteOrRemovePortBreakoutC                         // Combine multiple logical ports into single port
 	setOrAddPortBreakoutC                               // Break out front panel port into multiple logical ports
-	setOrAddPortBreakoutSpeedC                          // Set speed on logical ports (lanes)
+	setOrAddPortBreakoutChanSpeedC                      // Set channel speed on logical ports (lanes)
 	setOrAddDescOnEthIntfC                              // Set description of Ethernet interface
 	setOrAddPortAutoNegOnEthIntfC                       // Enable or disable auto-negotiation on port
 	setOrAddPortMtuOnEthIntfC                           // Set MTU on port
@@ -87,7 +87,7 @@ type ConfigMngrT struct {
 	// transConfigLookupTbl every queued command should remove dependency from here
 	// e.g. when LAG is going to be remove, we should remove ports from this LAG, and LAG itself
 	transConfigLookupTbl *configLookupTablesT
-	transHasBeenStarted  bool
+	transHasBeenStarted  bool // marks if transaction has been started
 }
 
 func NewConfigMngrT() *ConfigMngrT {
