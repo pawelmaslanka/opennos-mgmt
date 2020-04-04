@@ -43,7 +43,7 @@ type SetPortBreakoutCmdT struct {
 
 // NewSetPortBreakoutCmdT create new instance of SetPortBreakoutCmdT type
 func NewSetPortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetPortBreakoutCmdT {
-	changes := make([]*diff.Change, maxChangeIdxC)
+	changes := make([]*diff.Change, maxChangePortBreakoutIdxC)
 	changes[numChannelsChangeIdxC] = numChansChg
 	changes[channelSpeedChangeIdxC] = chanSpeedChg
 	return &SetPortBreakoutCmdT{
@@ -55,14 +55,14 @@ func NewSetPortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Change,
 // into multiple logical ports
 func (this *SetPortBreakoutCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
+	return this.configurePortBreakout(shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *SetPortBreakoutCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
+	return this.configurePortBreakout(shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -85,7 +85,7 @@ type deletePortBreakoutCmdT struct {
 
 // NewSetPortBreakoutCmdT create new instance of deletePortBreakoutCmdT type
 func NewDeletePortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *deletePortBreakoutCmdT {
-	changes := make([]*diff.Change, maxChangeIdxC)
+	changes := make([]*diff.Change, maxChangePortBreakoutIdxC)
 	changes[numChannelsChangeIdxC] = numChansChg
 	changes[channelSpeedChangeIdxC] = chanSpeedChg
 	return &deletePortBreakoutCmdT{
@@ -97,14 +97,14 @@ func NewDeletePortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Chan
 // ports into single port
 func (this *deletePortBreakoutCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
+	return this.configurePortBreakout(shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *deletePortBreakoutCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doPortBreakoutCmd(shouldBeAbleOnlyToUndo)
+	return this.configurePortBreakout(shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -119,7 +119,7 @@ type SetPortBreakoutChanSpeedCmdT struct {
 
 // NewSetPortBreakoutCmdT create new instance of SetPortBreakoutChanSpeedCmdT type
 func NewSetPortBreakoutChanSpeedCmdT(change *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetPortBreakoutChanSpeedCmdT {
-	changes := make([]*diff.Change, maxChangeIdxC)
+	changes := make([]*diff.Change, maxChangePortBreakoutIdxC)
 	changes[channelSpeedChangeIdxC] = change
 	return &SetPortBreakoutChanSpeedCmdT{
 		commandT: newCommandT("set port breakout channel speed", changes, ethSwitchMgmt),
@@ -155,11 +155,11 @@ func (this *SetPortBreakoutChanSpeedCmdT) Equals(other CommandI) bool {
 const (
 	numChannelsChangeIdxC = iota
 	channelSpeedChangeIdxC
-	maxChangeIdxC
+	maxChangePortBreakoutIdxC
 )
 
-// It cannot work if you would want to be like this: func doPortBreakoutCmd(this *commandT, shouldBeAbleOnlyToUndo bool) error
-func (this *commandT) doPortBreakoutCmd(shouldBeAbleOnlyToUndo bool) error {
+// It cannot work if you would want to be like this: func configurePortBreakout(this *commandT, shouldBeAbleOnlyToUndo bool) error
+func (this *commandT) configurePortBreakout(shouldBeAbleOnlyToUndo bool) error {
 	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
 		return this.createErrorAccordingToExecutionState()
 	}

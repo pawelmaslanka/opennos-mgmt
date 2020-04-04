@@ -165,6 +165,7 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(ch *DiffChangeMg
 			return err
 		}
 
+		// TODO: Update	this.transConfigLookupTbl
 		ch.MarkAsProcessed()
 	}
 
@@ -172,7 +173,7 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(ch *DiffChangeMg
 }
 
 func (this *ConfigMngrT) appendSetPortBreakoutCmdToTransaction(ifname string, cmdToAdd *cmd.SetPortBreakoutCmdT) error {
-	setPortBreakoutCmds := this.cmdByIfname[setOrAddPortBreakoutC]
+	setPortBreakoutCmds := this.cmdByIfname[setPortBreakoutC]
 	for _, setPortBreakoutCmd := range setPortBreakoutCmds {
 		if setPortBreakoutCmd.Equals(cmdToAdd) {
 			return fmt.Errorf("Command %q already exists in transaction", cmdToAdd.GetName())
@@ -186,7 +187,7 @@ func (this *ConfigMngrT) appendSetPortBreakoutCmdToTransaction(ifname string, cm
 }
 
 func (this *ConfigMngrT) appendSetPortBreakoutChanSpeedCmdToTransaction(ifname string, cmdToAdd *cmd.SetPortBreakoutChanSpeedCmdT) error {
-	setPortBreakoutChanSpeedCmds := this.cmdByIfname[setOrAddPortBreakoutChanSpeedC]
+	setPortBreakoutChanSpeedCmds := this.cmdByIfname[setPortBreakoutChanSpeedC]
 	for _, setPortBreakoutChanSpeedCmd := range setPortBreakoutChanSpeedCmds {
 		if setPortBreakoutChanSpeedCmd.Equals(cmdToAdd) {
 			return fmt.Errorf("Command %q already exists in transaction", cmdToAdd.GetName())
@@ -196,5 +197,106 @@ func (this *ConfigMngrT) appendSetPortBreakoutChanSpeedCmdToTransaction(ifname s
 	log.Infof("Append command %q to transaction", cmdToAdd.GetName())
 
 	setPortBreakoutChanSpeedCmds[ifname] = cmdToAdd
+	this.addCmdToListTrans(cmdToAdd)
+	return nil
+}
+
+func (this *ConfigMngrT) isEthIntfGoingToBeAvailableAfterPortBreakout(ifname string) bool {
+	if _, exists := this.transConfigLookupTbl.idxByIntfName[ifname]; exists {
+		return true
+	}
+
+	return false
+}
+
+func (this *ConfigMngrT) ValidatePortBreakoutChange(changedItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+	ifname := changedItem.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
+	if !this.isEthIntfAvailable(ifname) {
+		return fmt.Errorf("Port %s is unrecognized", ifname)
+	}
+
+	var numChannels cmd.PortBreakoutModeT = cmd.PortBreakoutModeInvalidC
+	var channelSpeed oc.E_OpenconfigIfEthernet_ETHERNET_SPEED = oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
+	var numChannelsChangeItem *DiffChangeMgmtT
+	var channelSpeedChangeItem *DiffChangeMgmtT
+	var err error
+
+	if changedItem.Change.Path[cmd.PortBreakoutNumChanPathItemIdxC] == cmd.PortBreakoutNumChanPathItemC {
+		channelSpeed, err = this.getPortBreakoutChannelSpeedFromChangelog(ifname, changelog)
+		if err != nil {
+			return err
+		}
+
+		numChannels = cmd.PortBreakoutModeT(changedItem.Change.To.(uint8))
+		if !this.isValidPortBreakoutNumChannels(numChannels) {
+			return fmt.Errorf("Number of channels (%d) to breakout is invalid", numChannels)
+		}
+
+		channelSpeedChangeItem, err = this.getPortBreakoutChannelSpeedChangeItemFromChangelog(ifname, changelog)
+		if err != nil {
+			return err
+		}
+		numChannelsChangeItem = changedItem
+	} else if changedItem.Change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] == cmd.PortBreakoutChanSpeedPathItemC {
+		numChannels, err = this.getPortBreakoutNumChannelsFromChangelog(ifname, changelog)
+		if err != nil {
+			return this.validatePortBreakoutChannSpeedChanging(changedItem, changelog)
+		}
+
+		channelSpeed = changedItem.Change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
+		if !this.isValidPortBreakoutChannelSpeed(numChannels, channelSpeed) {
+			return fmt.Errorf("Speed channel (%d) is invalid", channelSpeed)
+		}
+
+		numChannelsChangeItem, err = this.getPortBreakoutNumChannelsChangeItemFromChangelog(ifname, changelog)
+		if err != nil {
+			return err
+		}
+		channelSpeedChangeItem = changedItem
+	} else {
+		return fmt.Errorf("Unable to get port breakout changing")
+	}
+
+	log.Infof("Requested changing port %s breakout into mode %d with speed %d", ifname, numChannels, channelSpeed)
+	setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
+	if numChannels == cmd.PortBreakoutModeNoneC {
+		for i := 1; i <= 4; i++ {
+			slavePort := fmt.Sprintf("%s.%d", ifname, i)
+			log.Infof("Composed slave port: %s", slavePort)
+			if err := this.transConfigLookupTbl.checkDependenciesForDeletePortBreakout(slavePort); err != nil {
+				return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
+					setPortBreakoutCmd.GetName(), slavePort, err)
+			}
+		}
+	} else {
+		if err := this.transConfigLookupTbl.checkDependenciesForDeletePortBreakout(ifname); err != nil {
+			return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
+				setPortBreakoutCmd.GetName(), ifname, err)
+		}
+	}
+
+	if this.transHasBeenStarted {
+		setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
+		if err = this.appendSetPortBreakoutCmdToTransaction(ifname, setPortBreakoutCmd); err != nil {
+			return err
+		}
+
+		if numChannels == cmd.PortBreakoutModeNoneC {
+			if err := this.transConfigLookupTbl.addNewInterfaceIfItDoesNotExist(ifname); err != nil {
+				return err
+			}
+		} else {
+			for i := 1; i <= 4; i++ {
+				slavePort := fmt.Sprintf("%s.%d", ifname, i)
+				if err := this.transConfigLookupTbl.addNewInterfaceIfItDoesNotExist(slavePort); err != nil {
+					return err
+				}
+			}
+		}
+
+		numChannelsChangeItem.MarkAsProcessed()
+		channelSpeedChangeItem.MarkAsProcessed()
+	}
+
 	return nil
 }

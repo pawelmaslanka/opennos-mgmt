@@ -1,6 +1,7 @@
 package config
 
 import (
+	"container/list"
 	"errors"
 	"fmt"
 	"opennos-mgmt/gnmi"
@@ -23,42 +24,41 @@ type OrdinalNumberT uint16
 
 // The following constants define ordering numbers of actions in transaction
 const (
-	unorderedActionInTransactionC        OrdinalNumberT = iota
-	deleteOrRemoveIpv4FromEthIntfC                      // Remove IPv4/CIDRv4 address from Ethernet interface
-	deleteOrRemoveIpv4FromLagIntfC                      // Remove IPv4/CIDRv4 address from LAG interface
-	deleteOrRemoveIpv6FromEthIntfC                      // Remove IPv6/CIDRv6 address from Ethernet interface
-	deleteOrRemoveIpv6FromLagIntfC                      // Remove IPv6/CIDRv6 address from LAG interface
-	deleteOrRemoveEthIntfFromAccessVlanC                // Remove Ethernet interface from access VLAN
-	deleteOrRemoveLagIntfFromAccessVlanC                // Remove LAG interface from access VLAN
-	deleteOrRemoveEthIntfFromNativeVlanC                // Remove Ethernet interface from native VLAN
-	deleteOrRemoveLagIntfFromNativeVlanC                // Remove LAG interface from native VLAN
-	deleteOrRemoveEthIntfFromTrunkVlanC                 // Remove Ethernet interface from trunk VLAN
-	deleteOrRemoveLagIntfFromTrunkVlanC                 // Remove LAG interface from trunk VLAN
-	deleteOrRemoveEthIntfFromLagIntfC                   // Remove Ethernet interface from LAG membership
-	deleteOrRemoveLagIntfC                              // Delete LAG interface
-	deleteOrRemovePortBreakoutC                         // Combine multiple logical ports into single port
-	setOrAddPortBreakoutC                               // Break out front panel port into multiple logical ports
-	setOrAddPortBreakoutChanSpeedC                      // Set channel speed on logical ports (lanes)
-	setOrAddDescOnEthIntfC                              // Set description of Ethernet interface
-	setOrAddPortAutoNegOnEthIntfC                       // Enable or disable auto-negotiation on port
-	setOrAddPortMtuOnEthIntfC                           // Set MTU on port
-	setOrAddPortSpeedOnEthIntfC                         // Set port speed
-	setOrAddLagIntfC                                    // Add LAG interface
-	setOrAddIpv4OnEthIntfC                              // Assign IPv4/CIDRv4 address to Ethernet interface
-	setOrAddIpv4OnLagIntfC                              // Assign IPv4/CIDRv4 address to LAG interface
-	setOrAddIpv6OnEthIntfC                              // Assign IPv6/CIDRv6 address to Ethernet interface
-	setOrAddIpv6OnLagIntfC                              // Assign IPv6/CIDRv6 address to LAG interface
-	setOrAddVlanIntfModeOfLagIntfC                      // Set VLAN interface mode
-	setOrAddAccessVlanOnEthIntfC                        // Assign Ethernet interface to access VLAN
-	setOrAddAccessVlanOnLagIntfC                        // Assign LAG interface to access VLAN
-	setOrAddNativeVlanOnEthIntfC                        // Assign Ethernet interface to native VLAN
-	setOrAddNativeVlanOnLagIntfC                        // Assign LAG interface to native VLAN
-	setOrAddTrunkVlanOnEthIntfC                         // Assign Ethernet interface to trunk VLAN
-	setOrAddTrunkVlanOnLagIntfC                         // Assign LAG interface to trunk VLAN
-	setOrAddLagTypeOfLagIntfC                           // Set the type of LAG
-	setOrAddLacpIntervalC                               // Set the period between LACP messages
-	setOrAddLacpModeC                                   // Set LACP activity - active or passive
-	maxNumberOfActionsInTransactionC                    // Defines maximum number of possible actions in transaction
+	unorderedActionInTransactionC    OrdinalNumberT = iota
+	deleteIpv4AddrFromEthIntfC                      // Remove IPv4/CIDRv4 address from Ethernet interface
+	deleteIpv4AddrFromLagIntfC                      // Remove IPv4/CIDRv4 address from LAG interface
+	deleteIpv6AddrFromEthIntfC                      // Remove IPv6/CIDRv6 address from Ethernet interface
+	deleteIpv6AddrFromLagIntfC                      // Remove IPv6/CIDRv6 address from LAG interface
+	deleteEthIntfFromAccessVlanC                    // Remove Ethernet interface from access VLAN
+	deleteLagIntfFromAccessVlanC                    // Remove LAG interface from access VLAN
+	deleteEthIntfFromNativeVlanC                    // Remove Ethernet interface from native VLAN
+	deleteLagIntfFromNativeVlanC                    // Remove LAG interface from native VLAN
+	deleteEthIntfFromTrunkVlanC                     // Remove Ethernet interface from trunk VLAN
+	deleteEthIntfFromLagIntfC                       // Remove Ethernet interface from LAG membership
+	deleteLagIntfC                                  // Delete LAG interface
+	deletePortBreakoutC                             // Combine multiple logical ports into single port
+	setPortBreakoutC                                // Break out front panel port into multiple logical ports
+	setPortBreakoutChanSpeedC                       // Set channel speed on logical ports (lanes)
+	setDescForEthIntfC                              // Set description of Ethernet interface
+	setPortAutoNegForEthIntfC                       // Enable or disable auto-negotiation on port
+	setPortMtuForEthIntfC                           // Set MTU on port
+	setPortSpeedForEthIntfC                         // Set port speed
+	setLagIntfC                                     // Add LAG interface
+	setIpv4AddrForEthIntfC                          // Assign IPv4/CIDRv4 address to Ethernet interface
+	setIpv4AddrForLagIntfC                          // Assign IPv4/CIDRv4 address to LAG interface
+	setIpv6AddrForEthIntfC                          // Assign IPv6/CIDRv6 address to Ethernet interface
+	setIpv6AddrForLagIntfC                          // Assign IPv6/CIDRv6 address to LAG interface
+	setVlanIntfModeOfLagIntfC                       // Set VLAN interface mode
+	setAccessVlanForEthIntfC                        // Assign Ethernet interface to access VLAN
+	setAccessVlanForLagIntfC                        // Assign LAG interface to access VLAN
+	setNativeVlanForEthIntfC                        // Assign Ethernet interface to native VLAN
+	setNativeVlanForLagIntfC                        // Assign LAG interface to native VLAN
+	setTrunkVlanForEthIntfC                         // Assign Ethernet interface to trunk VLAN
+	setTrunkVlanForLagIntfC                         // Assign LAG interface to trunk VLAN
+	setLagTypeOfLagIntfC                            // Set the type of LAG
+	setLacpIntervalC                                // Set the period between LACP messages
+	setLacpModeC                                    // Set LACP activity - active or passive
+	maxNumberOfActionsInTransactionC                // Defines maximum number of possible actions in transaction
 )
 
 const (
@@ -87,6 +87,7 @@ type ConfigMngrT struct {
 	// transConfigLookupTbl every queued command should remove dependency from here
 	// e.g. when LAG is going to be remove, we should remove ports from this LAG, and LAG itself
 	transConfigLookupTbl *configLookupTablesT
+	transCmdList         *list.List
 	transHasBeenStarted  bool // marks if transaction has been started
 }
 
@@ -114,15 +115,15 @@ func (this *ConfigMngrT) NewTransaction() error {
 		this.cmdByIfname[i][nilCmd.GetName()] = nilCmd
 	}
 
-	this.transConfigLookupTbl = newConfigLookupTables()
-	copier.Copy(&this.transConfigLookupTbl, &this.configLookupTbl)
+	this.transConfigLookupTbl = this.configLookupTbl.makeCopy()
+	this.transCmdList = list.New()
 	this.ethSwitchMgmtClientConn = conn
 	this.ethSwitchMgmtClient = &ethSwitchMgmtClient
 	this.transHasBeenStarted = true
 	return nil
 }
 
-func (this *ConfigMngrT) Commit() error {
+func (this *ConfigMngrT) CommitBackup() error {
 	if !this.transHasBeenStarted {
 		return errors.New("Transaction not has been started")
 	}
@@ -145,7 +146,28 @@ func (this *ConfigMngrT) Commit() error {
 	return nil
 }
 
-func (this *ConfigMngrT) Rollback() error {
+func (this *ConfigMngrT) Commit() error {
+	if !this.transHasBeenStarted {
+		return errors.New("Transaction not has been started")
+	}
+
+	for ex := this.transCmdList.Front(); ex != nil; ex = ex.Next() {
+		execCmd := ex.Value.(cmd.CommandI)
+		log.Infof("Execute command %q", execCmd.GetName())
+		if err := execCmd.Execute(); err != nil {
+			for un := ex.Prev(); un != nil; un = un.Prev() {
+				undoCmd := un.Value.(cmd.CommandI)
+				undoCmd.Undo()
+			}
+			this.DiscardOrFinishTrans()
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (this *ConfigMngrT) RollbackBackup() error {
 	if !this.transHasBeenStarted {
 		return errors.New("Transaction not has been started")
 	}
@@ -168,19 +190,40 @@ func (this *ConfigMngrT) Rollback() error {
 	return nil
 }
 
-func (this *ConfigMngrT) CommitConfirm() error {
+func (this *ConfigMngrT) Rollback() error {
 	if !this.transHasBeenStarted {
 		return errors.New("Transaction not has been started")
 	}
+
+	for un := this.transCmdList.Back(); un != nil; un = un.Prev() {
+		undoCmd := un.Value.(cmd.CommandI)
+		log.Infof("Undo command %q", undoCmd.GetName())
+		if err := undoCmd.Undo(); err != nil {
+			for ex := un.Next(); ex != nil; ex = ex.Next() {
+				execCmd := ex.Value.(cmd.CommandI)
+				execCmd.Execute()
+			}
+			this.DiscardOrFinishTrans()
+			return err
+		}
+	}
+
 	this.DiscardOrFinishTrans()
 	return nil
+}
+
+func (this *ConfigMngrT) CommitConfirm() error {
+	return this.Commit()
 }
 
 func (this *ConfigMngrT) Confirm() error {
 	if !this.transHasBeenStarted {
 		return errors.New("Transaction not has been started")
 	}
-	// TODO: Implement logic
+
+	this.configLookupTbl = this.transConfigLookupTbl.makeCopy()
+
+	this.DiscardOrFinishTrans()
 	return nil
 }
 
@@ -191,6 +234,7 @@ func (this *ConfigMngrT) DiscardOrFinishTrans() error {
 	this.ethSwitchMgmtClientConn.Close()
 	this.ethSwitchMgmtClient = nil
 	this.transConfigLookupTbl = nil
+	this.transCmdList.Init()
 	this.transHasBeenStarted = false
 	return nil
 }
@@ -266,6 +310,18 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 	return this.CommitCandidateConfig(&configModel)
 }
 
+func (this *ConfigMngrT) IsChangedIpv4AddrEth(change *diff.Change) bool {
+	if len(change.Path) < cmd.Ipv4AddrEthPathItemsCountC {
+		return false
+	}
+
+	if (change.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] != cmd.Ipv4AddrEthIntfPathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfPathItemIdxC] != cmd.Ipv4AddrEthSubintfPathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4PathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4PathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPathItemC) || ((change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemC) && (change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemC)) {
+		return false
+	}
+
+	return true
+}
+
 func (this *ConfigMngrT) IsChangedPortBreakout(change *diff.Change) bool {
 	if len(change.Path) < cmd.PortBreakoutPathItemsCountC {
 		return false
@@ -290,7 +346,43 @@ func (this *ConfigMngrT) IsChangedPortBreakoutChanSpeed(change *diff.Change) boo
 	return true
 }
 
-func (this *ConfigMngrT) IsIntfAvailable(ifname string) bool {
+// TODO: Maybe move it into DiscardOrFinishTrans()
+func (this *ConfigMngrT) CommitCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) error {
+	// TODO: Consider if we should commit transConfigLookupTable here?
+	// var configData []byte
+	// configData, err := json.Marshal(*candidateConfig)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// log.Infof("%s", configData)
+
+	// err = oc.Unmarshal(configData, this.runningConfig)
+	// // err = json.Unmarshal(configData, &this.runningConfig)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// log.Infof("%v", this.runningConfig)
+
+	// return nil
+
+	// model := gnmi.NewModel(modeldata.ModelData,
+	// 	reflect.TypeOf((*oc.Device)(nil)),
+	// 	oc.SchemaTree["Device"],
+	// 	oc.Unmarshal,
+	// 	oc.ΛEnum)
+	// this.runningConfig, err = model.NewConfigStruct(configData)
+	// return err
+	// TODO: Make deep copy
+	return copier.Copy(&this.runningConfig, &candidateConfig)
+}
+
+func (this *ConfigMngrT) GetDiffRunningConfigWithCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) (diff.Changelog, error) {
+	return diff.Diff(this.runningConfig, *candidateConfig)
+}
+
+func (this *ConfigMngrT) isEthIntfAvailable(ifname string) bool {
 	if _, exists := this.configLookupTbl.idxByIntfName[ifname]; exists {
 		return true
 	}
@@ -298,90 +390,71 @@ func (this *ConfigMngrT) IsIntfAvailable(ifname string) bool {
 	return false
 }
 
-func (this *ConfigMngrT) ValidatePortBreakoutChanging(changedItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
-	ifname := changedItem.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
-	if !this.IsIntfAvailable(ifname) {
-		return fmt.Errorf("Port %s is unrecognized", ifname)
-	}
+func (this *ConfigMngrT) addCmdToListTrans(cmd cmd.CommandI) {
+	this.transCmdList.PushBack(cmd)
+}
 
-	var numChannels cmd.PortBreakoutModeT = cmd.PortBreakoutModeInvalidC
-	var channelSpeed oc.E_OpenconfigIfEthernet_ETHERNET_SPEED = oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
-	var numChannelsChangeItem *DiffChangeMgmtT
-	var channelSpeedChangeItem *DiffChangeMgmtT
+func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool) error {
 	var err error
-
-	if changedItem.Change.Path[cmd.PortBreakoutNumChanPathItemIdxC] == cmd.PortBreakoutNumChanPathItemC {
-		channelSpeed, err = this.getPortBreakoutChannelSpeedFromChangelog(ifname, changelog)
-		if err != nil {
+	if !dryRun {
+		defer this.DiscardOrFinishTrans()
+		if err = this.NewTransaction(); err != nil {
+			log.Errorf("Failed to start new transaction")
 			return err
-		}
-
-		numChannels = cmd.PortBreakoutModeT(changedItem.Change.To.(uint8))
-		if !this.isValidPortBreakoutNumChannels(numChannels) {
-			return fmt.Errorf("Number of channels (%d) to breakout is invalid", numChannels)
-		}
-
-		channelSpeedChangeItem, err = this.getPortBreakoutChannelSpeedChangeItemFromChangelog(ifname, changelog)
-		if err != nil {
-			return err
-		}
-		numChannelsChangeItem = changedItem
-	} else if changedItem.Change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] == cmd.PortBreakoutChanSpeedPathItemC {
-		numChannels, err = this.getPortBreakoutNumChannelsFromChangelog(ifname, changelog)
-		if err != nil {
-			return this.validatePortBreakoutChannSpeedChanging(changedItem, changelog)
-		}
-
-		channelSpeed = changedItem.Change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
-		if !this.isValidPortBreakoutChannelSpeed(numChannels, channelSpeed) {
-			return fmt.Errorf("Speed channel (%d) is invalid", channelSpeed)
-		}
-
-		numChannelsChangeItem, err = this.getPortBreakoutNumChannelsChangeItemFromChangelog(ifname, changelog)
-		if err != nil {
-			return err
-		}
-		channelSpeedChangeItem = changedItem
-	} else {
-		return fmt.Errorf("Unable to get port breakout changing")
-	}
-
-	log.Infof("Requested changing port %s breakout into mode %d with speed %d", ifname, numChannels, channelSpeed)
-	setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
-	if numChannels == cmd.PortBreakoutModeNoneC {
-		for i := 1; i <= 4; i++ {
-			slavePort := fmt.Sprintf("%s.%d", ifname, i)
-			log.Infof("Composed slave port: %s", slavePort)
-			if err := this.configLookupTbl.checkDependenciesForDeletePortBreakout(slavePort); err != nil {
-				return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
-					setPortBreakoutCmd.GetName(), slavePort, err)
-			}
 		}
 	} else {
-		if err := this.configLookupTbl.checkDependenciesForDeletePortBreakout(ifname); err != nil {
-			return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
-				setPortBreakoutCmd.GetName(), ifname, err)
-		}
+		this.transConfigLookupTbl = this.configLookupTbl.makeCopy()
 	}
 
-	if this.transHasBeenStarted {
-		setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
-		if err = this.appendSetPortBreakoutCmdToTransaction(ifname, setPortBreakoutCmd); err != nil {
+	diffChangelog := NewDiffChangelogMgmtT(changelog)
+	// Deletion section
+	if err := this.processDeleteIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
+		return err
+	}
+
+	// Go through all deletion operation
+	// else if configMngr.IsDeleteIpv6AddrEth(changedItem.Change) {
+	// } else if configMngr.IsDeleteIpv4AddrLag(changedItem.Change) {
+	// } else if configMngr.IsDeleteIpv6AddrLag(changedItem.Change) {
+	// } ...
+
+	// Set section
+	// if this.IsChangedPortBreakout(changedItem.Change) {
+	// 	if err := this.ValidatePortBreakoutChange(changedItem, diffChangelog); err != nil {
+	// 		log.Errorf("%s", err)
+	// 		return err
+	// 	}
+	// }
+	// if len(changedItem.Change.Path) > 4 {
+	// 	if "NativeVlan" == changedItem.Change.Path[4] {
+	// 		port := make([]string, 1)
+	// 		port[0] = changedItem.Change.Path[1]
+	// 		// TODO: Uncomment if build is dedicated for target device
+	// 		// if err := vlan.SetNativeVlan(port, changedItem.To.(uint16)); err != nil {
+	// 		// 	log.Errorf("Failed to set native VLAN")
+	// 		// 	return err
+	// 		// }
+	// 		log.Infof("Native VLAN has been changed to %d on port %s",
+	// 			changedItem.Change.To, changedItem.Change.Path[1])
+	// 	}
+	// } else if len(changedItem.Change.Path) > 2 {
+	// 	if "Mtu" == changedItem.Change.Path[2] {
+	// 		log.Infof("Changing MTU to %d on port %s", changedItem.Change.To, changedItem.Change.Path[1])
+	// 	}
+	// }
+
+	if !dryRun {
+		if err := this.Commit(); err != nil {
+			log.Errorf("Failed to commit changes")
 			return err
 		}
-
-		numChannelsChangeItem.MarkAsProcessed()
-		channelSpeedChangeItem.MarkAsProcessed()
+		if err := this.Confirm(); err != nil {
+			log.Errorf("Failed to confirm committed changes")
+			return err
+		}
+	} else {
+		this.transConfigLookupTbl = nil
 	}
 
 	return nil
-}
-
-// TODO: Maybe move it into DiscardOrFinishTrans()
-func (this *ConfigMngrT) CommitCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) error {
-	return copier.Copy(&this.runningConfig, candidateConfig)
-}
-
-func (this *ConfigMngrT) GetDiffRunningConfigWithCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) (diff.Changelog, error) {
-	return diff.Diff(this.runningConfig, *candidateConfig)
 }
