@@ -76,42 +76,6 @@ func (this *SetPortBreakoutCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
-// deletePortBreakoutCmdT implements command for combine Ccmbine multiple logical ports into
-// single port
-// TODO: Consider if it is needed because we don't removing any parameters, we just edit port breakout mode
-type deletePortBreakoutCmdT struct {
-	*commandT // commandT is embedded as a pointer because its state will be modify
-}
-
-// NewSetPortBreakoutCmdT create new instance of deletePortBreakoutCmdT type
-func NewDeletePortBreakoutCmdT(numChansChg *diff.Change, chanSpeedChg *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *deletePortBreakoutCmdT {
-	changes := make([]*diff.Change, maxChangePortBreakoutIdxC)
-	changes[numChannelsChangeIdxC] = numChansChg
-	changes[channelSpeedChangeIdxC] = chanSpeedChg
-	return &deletePortBreakoutCmdT{
-		commandT: newCommandT("withdraw port breakout", changes, ethSwitchMgmt),
-	}
-}
-
-// Execute implements the same method from CommandI interface and combines multiple logical
-// ports into single port
-func (this *deletePortBreakoutCmdT) Execute() error {
-	shouldBeAbleOnlyToUndo := false
-	return this.configurePortBreakout(shouldBeAbleOnlyToUndo)
-}
-
-// Undo implements the same method from CommandI interface and withdraws changes performed by
-// previously execution of Execute() method
-func (this *deletePortBreakoutCmdT) Undo() error {
-	shouldBeAbleOnlyToUndo := true
-	return this.configurePortBreakout(shouldBeAbleOnlyToUndo)
-}
-
-// GetName implements the same method from CommandI interface and returns name of command
-func (this *deletePortBreakoutCmdT) GetName() string {
-	return this.name
-}
-
 // SetPortBreakoutChanSpeedCmdT implements command for change speed onto all sub-ports
 type SetPortBreakoutChanSpeedCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify

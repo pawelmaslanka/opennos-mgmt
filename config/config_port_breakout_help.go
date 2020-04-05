@@ -9,7 +9,7 @@ import (
 	"github.com/r3labs/diff"
 )
 
-func (this *ConfigMngrT) getPortBreakoutChannelSpeedFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (oc.E_OpenconfigIfEthernet_ETHERNET_SPEED, error) {
+func (this *ConfigMngrT) findPortBreakoutChanSpeedFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (oc.E_OpenconfigIfEthernet_ETHERNET_SPEED, error) {
 	var err error = nil
 	channelSpeed := oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
 	for _, changedItem := range changelog.Changes {
@@ -29,7 +29,7 @@ func (this *ConfigMngrT) getPortBreakoutChannelSpeedFromChangelog(ifname string,
 	return channelSpeed, err
 }
 
-func (this *ConfigMngrT) getPortBreakoutChannelSpeedChangeItemFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, error) {
+func (this *ConfigMngrT) findPortBreakoutChanSpeedChangeFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, error) {
 	var err error = nil
 	var changeItem *DiffChangeMgmtT
 	channelSpeed := oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
@@ -102,7 +102,7 @@ func (this *ConfigMngrT) isValidPortBreakoutChannelSpeed(numChannels cmd.PortBre
 	return false
 }
 
-func (this *ConfigMngrT) getPortBreakoutNumChannelsFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (cmd.PortBreakoutModeT, error) {
+func (this *ConfigMngrT) findPortBreakoutNumChannelsFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (cmd.PortBreakoutModeT, error) {
 	var err error = nil
 	numChannels := cmd.PortBreakoutModeInvalidC
 	for _, ch := range changelog.Changes {
@@ -122,7 +122,7 @@ func (this *ConfigMngrT) getPortBreakoutNumChannelsFromChangelog(ifname string, 
 	return numChannels, err
 }
 
-func (this *ConfigMngrT) getPortBreakoutNumChannelsChangeItemFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, error) {
+func (this *ConfigMngrT) findPortBreakoutNumChannelsChangeFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, error) {
 	var err error = nil
 	var changeItem *DiffChangeMgmtT
 	numChannels := cmd.PortBreakoutModeInvalidC
@@ -144,7 +144,7 @@ func (this *ConfigMngrT) getPortBreakoutNumChannelsChangeItemFromChangelog(ifnam
 	return changeItem, err
 }
 
-func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(ch *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+func (this *ConfigMngrT) validatePortBreakoutChannSpeedChange(ch *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
 	ifname := ch.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
 	log.Infof("Requested changing of channel speed on subports of port %s", ifname)
 	device := this.runningConfig.(*oc.Device)
@@ -165,7 +165,6 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChanging(ch *DiffChangeMg
 			return err
 		}
 
-		// TODO: Update	this.transConfigLookupTbl
 		ch.MarkAsProcessed()
 	}
 
@@ -209,7 +208,31 @@ func (this *ConfigMngrT) isEthIntfGoingToBeAvailableAfterPortBreakout(ifname str
 	return false
 }
 
-func (this *ConfigMngrT) ValidatePortBreakoutChange(changedItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+func (this *ConfigMngrT) isChangedPortBreakout(change *diff.Change) bool {
+	if len(change.Path) != cmd.PortBreakoutPathItemsCountC {
+		return false
+	}
+
+	if (change.Path[cmd.PortBreakoutCompPathItemIdxC] != cmd.PortBreakoutCompPathItemC) || (change.Path[cmd.PortBreakoutPortPathItemIdxC] != cmd.PortBreakoutPortPathItemC) || (change.Path[cmd.PortBreakoutModePathItemIdxC] != cmd.PortBreakoutModePathItemC) || ((change.Path[cmd.PortBreakoutNumChanPathItemIdxC] != cmd.PortBreakoutNumChanPathItemC) && (change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] != cmd.PortBreakoutChanSpeedPathItemC)) {
+		return false
+	}
+
+	return true
+}
+
+func (this *ConfigMngrT) isChangedPortBreakoutChanSpeed(change *diff.Change) bool {
+	if len(change.Path) != cmd.PortBreakoutPathItemsCountC {
+		return false
+	}
+
+	if (change.Path[cmd.PortBreakoutCompPathItemIdxC] != cmd.PortBreakoutCompPathItemC) || (change.Path[cmd.PortBreakoutPortPathItemIdxC] != cmd.PortBreakoutPortPathItemC) || (change.Path[cmd.PortBreakoutModePathItemIdxC] != cmd.PortBreakoutModePathItemC) || (change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] != cmd.PortBreakoutChanSpeedPathItemC) {
+		return false
+	}
+
+	return true
+}
+
+func (this *ConfigMngrT) validatePortBreakoutChange(changedItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
 	ifname := changedItem.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
 	if !this.isEthIntfAvailable(ifname) {
 		return fmt.Errorf("Port %s is unrecognized", ifname)
@@ -222,7 +245,7 @@ func (this *ConfigMngrT) ValidatePortBreakoutChange(changedItem *DiffChangeMgmtT
 	var err error
 
 	if changedItem.Change.Path[cmd.PortBreakoutNumChanPathItemIdxC] == cmd.PortBreakoutNumChanPathItemC {
-		channelSpeed, err = this.getPortBreakoutChannelSpeedFromChangelog(ifname, changelog)
+		channelSpeed, err = this.findPortBreakoutChanSpeedFromChangelog(ifname, changelog)
 		if err != nil {
 			return err
 		}
@@ -232,15 +255,15 @@ func (this *ConfigMngrT) ValidatePortBreakoutChange(changedItem *DiffChangeMgmtT
 			return fmt.Errorf("Number of channels (%d) to breakout is invalid", numChannels)
 		}
 
-		channelSpeedChangeItem, err = this.getPortBreakoutChannelSpeedChangeItemFromChangelog(ifname, changelog)
+		channelSpeedChangeItem, err = this.findPortBreakoutChanSpeedChangeFromChangelog(ifname, changelog)
 		if err != nil {
 			return err
 		}
 		numChannelsChangeItem = changedItem
 	} else if changedItem.Change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] == cmd.PortBreakoutChanSpeedPathItemC {
-		numChannels, err = this.getPortBreakoutNumChannelsFromChangelog(ifname, changelog)
+		numChannels, err = this.findPortBreakoutNumChannelsFromChangelog(ifname, changelog)
 		if err != nil {
-			return this.validatePortBreakoutChannSpeedChanging(changedItem, changelog)
+			return this.validatePortBreakoutChannSpeedChange(changedItem, changelog)
 		}
 
 		channelSpeed = changedItem.Change.To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED)
@@ -248,7 +271,7 @@ func (this *ConfigMngrT) ValidatePortBreakoutChange(changedItem *DiffChangeMgmtT
 			return fmt.Errorf("Speed channel (%d) is invalid", channelSpeed)
 		}
 
-		numChannelsChangeItem, err = this.getPortBreakoutNumChannelsChangeItemFromChangelog(ifname, changelog)
+		numChannelsChangeItem, err = this.findPortBreakoutNumChannelsChangeFromChangelog(ifname, changelog)
 		if err != nil {
 			return err
 		}
@@ -299,4 +322,68 @@ func (this *ConfigMngrT) ValidatePortBreakoutChange(changedItem *DiffChangeMgmtT
 	}
 
 	return nil
+}
+
+func (this *ConfigMngrT) findSetPortBreakout(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
+	for _, ch := range changelog.Changes {
+		if !ch.IsProcessed() {
+			if ch.Change.Type == diff.UPDATE {
+				if this.isChangedPortBreakout(ch.Change) {
+					return ch, true
+				}
+			}
+		}
+	}
+
+	return nil, false
+}
+
+func (this *ConfigMngrT) findSetPortBreakoutChanSpeed(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
+	for _, ch := range changelog.Changes {
+		if !ch.IsProcessed() {
+			if ch.Change.Type == diff.UPDATE {
+				if this.isChangedPortBreakoutChanSpeed(ch.Change) {
+					return ch, true
+				}
+			}
+		}
+	}
+
+	return nil, false
+}
+
+func (this *ConfigMngrT) processSetPortBreakoutFromChangelog(changelog *DiffChangelogMgmtT) (int, error) {
+	var count int = 0
+	for {
+		// Repeat till there is not any change related to set port breakout for port
+		if change, exists := this.findSetPortBreakout(changelog); exists {
+			if err := this.validatePortBreakoutChange(change, changelog); err != nil {
+				return 0, err
+			}
+
+			count++
+		} else {
+			break
+		}
+	}
+
+	return count, nil
+}
+
+func (this *ConfigMngrT) processSetPortBreakoutChanSpeedFromChangelog(changelog *DiffChangelogMgmtT) (int, error) {
+	var count int = 0
+	for {
+		// Repeat till there is not any change related to set port breakout channel speed for subports
+		if change, exists := this.findSetPortBreakoutChanSpeed(changelog); exists {
+			if err := this.validatePortBreakoutChannSpeedChange(change, changelog); err != nil {
+				return 0, err
+			}
+
+			count++
+		} else {
+			break
+		}
+	}
+
+	return count, nil
 }

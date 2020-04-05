@@ -17,7 +17,7 @@ func (this *ConfigMngrT) getIpv4AddrEthSubintfIpFromChangelog(ifname string, cha
 		if this.IsChangedIpv4AddrEthSubintfIp(ch.Change) {
 			log.Infof("Found changing IPv4 address request too:\n%+v", ch.Change)
 			if ch.Change.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] == ifname {
-				ip = fmt.Sprintf("%s", ch.Change.To)
+				ip = fmt.Sprintf("%s", *ch.Change.To.(*string))
 				break
 			}
 		}
@@ -32,12 +32,12 @@ func (this *ConfigMngrT) getIpv4AddrEthSubintfIpFromChangelog(ifname string, cha
 
 func (this *ConfigMngrT) getIpv4AddrEthSubintfPrfxLenFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (uint8, error) {
 	var err error = nil
-	var prfxLen int32
+	var prfxLen uint8
 	for _, ch := range changelog.Changes {
 		if this.IsChangedIpv4AddrEthSubintfPrfxLen(ch.Change) {
 			log.Infof("Found changing IPv4 prefix len request too:\n%+v", ch.Change)
 			if ch.Change.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] == ifname {
-				prfxLen = ch.Change.To.(int32)
+				prfxLen = *ch.Change.To.(*uint8)
 				break
 			}
 		}
@@ -108,8 +108,8 @@ func (this *ConfigMngrT) findSetIpv4AddrEthSubintfPrfxLenChangeFromChangelog(ifn
 		return nil, errors.New("Not found IPv4 address prefix length")
 	}
 
-	if !lib.IsValidIpv4AddrPrfxLen(prfxLenChange.Change.To.(int32)) {
-		return nil, fmt.Errorf("IPv4 prefix length (%d) is invalid", prfxLenChange.Change.To.(int32))
+	if !lib.IsValidIpv4AddrPrfxLen(*prfxLenChange.Change.To.(*uint8)) {
+		return nil, fmt.Errorf("IPv4 prefix length (%d) is invalid", *prfxLenChange.Change.To.(*uint8))
 	}
 
 	return prfxLenChange, nil
@@ -127,7 +127,7 @@ func (this *ConfigMngrT) findDeleteIpv4AddrEthSubintfPrfxLenChangeFromChangelog(
 		}
 	}
 
-	return nil, errors.New("Not found IPv4 address prefi length")
+	return nil, errors.New("Not found IPv4 address prefix length")
 }
 
 func (this *ConfigMngrT) FindSetIpv4AddrEthSubintfIp(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
@@ -211,8 +211,7 @@ func (this *ConfigMngrT) appendDeleteIpv4AddrEthIntfCmdToTransaction(ifname stri
 	return nil
 }
 
-func (this *ConfigMngrT) validateSetIpv4AddrForEthIntf(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
-	log.Infof("Call validateSetIpv4AddrForEthIntf()")
+func (this *ConfigMngrT) validateSetIpv4AddrEthIntf(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
 	ifname := changeItem.Change.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC]
 	if !this.isEthIntfAvailable(ifname) {
 		if !this.isEthIntfGoingToBeAvailableAfterPortBreakout(ifname) {
@@ -271,7 +270,6 @@ func (this *ConfigMngrT) validateSetIpv4AddrForEthIntf(changeItem *DiffChangeMgm
 }
 
 func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
-	log.Infof("Call validateDeleteIpv4AddrEthIntf()")
 	ifname := changeItem.Change.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC]
 	if !this.isEthIntfAvailable(ifname) {
 		return fmt.Errorf("Ethernet interface %s is unrecognized", ifname)
@@ -303,7 +301,6 @@ func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgm
 	cidr := fmt.Sprintf("%s/%d", *ipChangeItem.Change.From.(*string), *prfxLenChangeItem.Change.From.(*uint8))
 	log.Infof("Requested delete IPv4 address %s from Ethernet interface %s", cidr, ifname)
 	deleteIpv4AddrEthIntfCmd := cmd.NewDeleteIpv4AddrEthIntfCmdT(ipChangeItem.Change, prfxLenChangeItem.Change, this.ethSwitchMgmtClient)
-	this.transConfigLookupTbl.dump()
 	if err := this.transConfigLookupTbl.checkDependenciesForDeleteIpv4AddrFromEthIntf(ifname, cidr); err != nil {
 		return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
 			deleteIpv4AddrEthIntfCmd.GetName(), ifname, err)
@@ -325,17 +322,38 @@ func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgm
 	return nil
 }
 
-func (this *ConfigMngrT) processDeleteIpv4AddrEthIntfFromChangelog(changelog *DiffChangelogMgmtT) error {
+func (this *ConfigMngrT) processSetIpv4AddrEthIntfFromChangelog(changelog *DiffChangelogMgmtT) (int, error) {
+	var count int = 0
 	for {
 		// Repeat till there is not any change related to delete IPv4 address from Ethernet interface
-		if change, exists := this.FindDeleteIpv4AddrEthSubintfIp(changelog); exists {
-			if err := this.validateDeleteIpv4AddrEthIntf(change, changelog); err != nil {
-				return err
+		if change, exists := this.FindSetIpv4AddrEthSubintfIp(changelog); exists {
+			if err := this.validateSetIpv4AddrEthIntf(change, changelog); err != nil {
+				return 0, err
 			}
+
+			count++
 		} else {
 			break
 		}
 	}
 
-	return nil
+	return count, nil
+}
+
+func (this *ConfigMngrT) processDeleteIpv4AddrEthIntfFromChangelog(changelog *DiffChangelogMgmtT) (int, error) {
+	var count int = 0
+	for {
+		// Repeat till there is not any change related to delete IPv4 address from Ethernet interface
+		if change, exists := this.FindDeleteIpv4AddrEthSubintfIp(changelog); exists {
+			if err := this.validateDeleteIpv4AddrEthIntf(change, changelog); err != nil {
+				return 0, err
+			}
+
+			count++
+		} else {
+			break
+		}
+	}
+
+	return count, nil
 }

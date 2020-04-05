@@ -322,30 +322,6 @@ func (this *ConfigMngrT) IsChangedIpv4AddrEth(change *diff.Change) bool {
 	return true
 }
 
-func (this *ConfigMngrT) IsChangedPortBreakout(change *diff.Change) bool {
-	if len(change.Path) < cmd.PortBreakoutPathItemsCountC {
-		return false
-	}
-
-	if (change.Path[cmd.PortBreakoutCompPathItemIdxC] != cmd.PortBreakoutCompPathItemC) || (change.Path[cmd.PortBreakoutPortPathItemIdxC] != cmd.PortBreakoutPortPathItemC) || (change.Path[cmd.PortBreakoutModePathItemIdxC] != cmd.PortBreakoutModePathItemC) || ((change.Path[cmd.PortBreakoutNumChanPathItemIdxC] != cmd.PortBreakoutNumChanPathItemC) && (change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] != cmd.PortBreakoutChanSpeedPathItemC)) {
-		return false
-	}
-
-	return true
-}
-
-func (this *ConfigMngrT) IsChangedPortBreakoutChanSpeed(change *diff.Change) bool {
-	if len(change.Path) < cmd.PortBreakoutPathItemsCountC {
-		return false
-	}
-
-	if (change.Path[cmd.PortBreakoutCompPathItemIdxC] != cmd.PortBreakoutCompPathItemC) || (change.Path[cmd.PortBreakoutPortPathItemIdxC] != cmd.PortBreakoutPortPathItemC) || (change.Path[cmd.PortBreakoutModePathItemIdxC] != cmd.PortBreakoutModePathItemC) || ((change.Path[cmd.PortBreakoutNumChanPathItemIdxC] != cmd.PortBreakoutNumChanPathItemC) && (change.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] != cmd.PortBreakoutChanSpeedPathItemC)) {
-		return false
-	}
-
-	return true
-}
-
 // TODO: Maybe move it into DiscardOrFinishTrans()
 func (this *ConfigMngrT) CommitCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) error {
 	// TODO: Consider if we should commit transConfigLookupTable here?
@@ -406,42 +382,59 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 		this.transConfigLookupTbl = this.configLookupTbl.makeCopy()
 	}
 
+	countChanges := len(*changelog)
+	var cnt int
 	diffChangelog := NewDiffChangelogMgmtT(changelog)
-	// Deletion section
-	if err := this.processDeleteIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
-		return err
+	for {
+		// Deletion section
+		if cnt, err = this.processDeleteIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		// Set section
+		if cnt, err = this.processSetPortBreakoutFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		if cnt, err = this.processSetPortBreakoutChanSpeedFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		if cnt, err = this.processSetIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		// if len(changedItem.Change.Path) > 4 {
+		// 	if "NativeVlan" == changedItem.Change.Path[4] {
+		// 		port := make([]string, 1)
+		// 		port[0] = changedItem.Change.Path[1]
+		// 		// TODO: Uncomment if build is dedicated for target device
+		// 		// if err := vlan.SetNativeVlan(port, changedItem.To.(uint16)); err != nil {
+		// 		// 	log.Errorf("Failed to set native VLAN")
+		// 		// 	return err
+		// 		// }
+		// 		log.Infof("Native VLAN has been changed to %d on port %s",
+		// 			changedItem.Change.To, changedItem.Change.Path[1])
+		// 	}
+		// } else if len(changedItem.Change.Path) > 2 {
+		// 	if "Mtu" == changedItem.Change.Path[2] {
+		// 		log.Infof("Changing MTU to %d on port %s", changedItem.Change.To, changedItem.Change.Path[1])
+		// 	}
+		// }
+		break
 	}
-
-	// Go through all deletion operation
-	// else if configMngr.IsDeleteIpv6AddrEth(changedItem.Change) {
-	// } else if configMngr.IsDeleteIpv4AddrLag(changedItem.Change) {
-	// } else if configMngr.IsDeleteIpv6AddrLag(changedItem.Change) {
-	// } ...
-
-	// Set section
-	// if this.IsChangedPortBreakout(changedItem.Change) {
-	// 	if err := this.ValidatePortBreakoutChange(changedItem, diffChangelog); err != nil {
-	// 		log.Errorf("%s", err)
-	// 		return err
-	// 	}
-	// }
-	// if len(changedItem.Change.Path) > 4 {
-	// 	if "NativeVlan" == changedItem.Change.Path[4] {
-	// 		port := make([]string, 1)
-	// 		port[0] = changedItem.Change.Path[1]
-	// 		// TODO: Uncomment if build is dedicated for target device
-	// 		// if err := vlan.SetNativeVlan(port, changedItem.To.(uint16)); err != nil {
-	// 		// 	log.Errorf("Failed to set native VLAN")
-	// 		// 	return err
-	// 		// }
-	// 		log.Infof("Native VLAN has been changed to %d on port %s",
-	// 			changedItem.Change.To, changedItem.Change.Path[1])
-	// 	}
-	// } else if len(changedItem.Change.Path) > 2 {
-	// 	if "Mtu" == changedItem.Change.Path[2] {
-	// 		log.Infof("Changing MTU to %d on port %s", changedItem.Change.To, changedItem.Change.Path[1])
-	// 	}
-	// }
 
 	if !dryRun {
 		if err := this.Commit(); err != nil {

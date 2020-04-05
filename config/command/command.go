@@ -3,7 +3,8 @@ package command
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+
+	log "github.com/golang/glog"
 
 	mgmt "opennos-eth-switch-service/mgmt"
 
@@ -71,17 +72,17 @@ func (cmd *commandT) createErrorAccordingToExecutionState() error {
 }
 
 func (cmd *commandT) dumpInternalData() {
-	log.Printf("Dump internal data of command %q", cmd.name)
-	log.Println("Change(s) to apply:")
+	log.Infof("Dump internal data of command %q", cmd.name)
+	log.Infoln("Change(s) to apply:")
 	indent := "    "
 	for _, ch := range cmd.changes {
 		if jsonDump, err := json.MarshalIndent(ch, "", indent); err != nil {
-			log.Printf("Failed to dump internal data of command %q: %s", cmd.name, err)
+			log.Infof("Failed to dump internal data of command %q: %s", cmd.name, err)
 		} else {
-			log.Printf("%s", string(jsonDump))
+			log.Infof("\n%s", string(jsonDump))
 		}
 	}
-	log.Printf("Has been already executed: %v", cmd.hasBeenExecuted)
+	log.Infof("Has been already executed: %v", cmd.hasBeenExecuted)
 }
 
 func (this *commandT) equals(other *commandT) bool {
@@ -91,22 +92,14 @@ func (this *commandT) equals(other *commandT) bool {
 		return false
 	}
 
-	for i, change := range this.changes {
-		if change.Type != other.changes[i].Type {
-			return false
-		} else if len(change.Path) != len(other.changes[i].Path) {
-			return false
-		} else if change.From != other.changes[i].From {
-			return false
-		} else if change.To != other.changes[i].To {
-			return false
-		}
+	changelog, err := diff.Diff(this.changes, other.changes)
+	if err != nil {
+		log.Errorf("Failed to get diff of two config objects: %s", err)
+		return false
+	}
 
-		for j, item := range change.Path {
-			if item != other.changes[i].Path[j] {
-				return false
-			}
-		}
+	if len(changelog) != 0 {
+		return false
 	}
 
 	return true
