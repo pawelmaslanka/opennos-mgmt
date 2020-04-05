@@ -427,6 +427,65 @@ func (s *Server) Capabilities(ctx context.Context, req *pb.CapabilityRequest) (*
 	}, nil
 }
 
+func InspectStructV(val reflect.Value) (*pb.TypedValue, error) {
+	if val.Kind() == reflect.Interface && !val.IsNil() {
+		elm := val.Elem()
+		if elm.Kind() == reflect.Ptr && !elm.IsNil() && elm.Elem().Kind() == reflect.Ptr {
+			val = elm
+		}
+	}
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	for i := 0; i < val.NumField(); i++ {
+		valueField := val.Field(i)
+		typeField := val.Type().Field(i)
+		address := "not-addressable"
+
+		if valueField.Kind() == reflect.Interface && !valueField.IsNil() {
+			elm := valueField.Elem()
+			if elm.Kind() == reflect.Ptr && !elm.IsNil() && elm.Elem().Kind() == reflect.Ptr {
+				valueField = elm
+			}
+		}
+
+		if valueField.Kind() == reflect.Ptr {
+			valueField = valueField.Elem()
+
+		}
+		if valueField.CanAddr() {
+			address = fmt.Sprintf("0x%X", valueField.Addr().Pointer())
+		}
+
+		fmt.Printf("Field Name: %s,\t Field Value: %v,\t Address: %v\t, Field type: %v\t, Field kind: %v\n", typeField.Name,
+			valueField.Interface(), address, typeField.Type, valueField.Kind())
+
+		if valueField.Kind() == reflect.Struct {
+			InspectStructV(valueField)
+		}
+
+		// TODO: Check if reflected type is uint16
+		// switch t.Elem().Kind() {  // type of the slice element
+		// 	case reflect.Int:
+		// 		// Handle int case
+		// 	case reflect.String:
+		// 		// Handle string case
+		// 	...
+		// 	default:
+		// 		// custom types or structs must be explicitly typed
+		// 		// using calls to reflect.TypeOf on the defined type.
+		// }
+		return &pb.TypedValue{Value: &pb.TypedValue_UintVal{UintVal: uint64(valueField.Interface().(uint16))}}, nil
+	}
+
+	return nil, nil
+}
+
+func InspectStruct(v interface{}) (*pb.TypedValue, error) {
+	return InspectStructV(reflect.ValueOf(v))
+}
+
 // Get implements the Get RPC in gNMI spec.
 func (s *Server) Get(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, error) {
 	if req.GetType() != pb.GetRequest_ALL {
@@ -480,6 +539,27 @@ func (s *Server) Get(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, 
 				val = &pb.TypedValue{
 					Value: &pb.TypedValue_StringVal{
 						StringVal: enumMap[reflect.ValueOf(node).Int()].Name,
+					},
+				}
+			case reflect.Slice:
+				t := reflect.ValueOf(node)
+				sa := &pb.ScalarArray{Element: make([]*pb.TypedValue, t.Len())}
+				log.Infof("Num of elements: %d", t.Len())
+				log.Infof("Type of element: %s", t.Index(0).Type().Name())
+				var err error
+				for i := 0; i < t.Len(); i++ {
+					sa.Element[i], err = InspectStruct(t.Index(i).Interface())
+					if err != nil {
+						msg := fmt.Sprintf("leaf node %v has a problem with reflect element type: %v", path, err)
+						log.Error(msg)
+						return nil, status.Error(codes.Internal, msg)
+					}
+					log.Infof("Get element: %v", sa.Element[i])
+				}
+				log.Infof("Content of result: %v", sa.GetElement())
+				val = &pb.TypedValue{
+					Value: &pb.TypedValue_LeaflistVal{
+						LeaflistVal: sa,
 					},
 				}
 			default:
