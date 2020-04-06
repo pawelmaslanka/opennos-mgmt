@@ -180,25 +180,32 @@ func (s *Server) doReplaceOrUpdate(jsonTree map[string]interface{}, op pb.Update
 	if stat.GetCode() != int32(cpb.Code_OK) {
 		return nil, status.Errorf(codes.NotFound, "path %v is not found in the config structure: %v", fullPath, stat)
 	}
+	var err error
 	var nodeVal interface{}
 	nodeStruct, ok := emptyNode.(ygot.ValidatedGoStruct)
 	if ok {
-		if err := s.model.jsonUnmarshaler(val.GetJsonIetfVal(), nodeStruct); err != nil {
+		if err = s.model.jsonUnmarshaler(val.GetJsonIetfVal(), nodeStruct); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "unmarshaling json data to config struct fails: %v", err)
 		}
-		if err := nodeStruct.Validate(); err != nil {
+		if err = nodeStruct.Validate(); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "config data validation fails: %v", err)
 		}
-		var err error
 		if nodeVal, err = ygot.ConstructIETFJSON(nodeStruct, &ygot.RFC7951JSONConfig{}); err != nil {
 			msg := fmt.Sprintf("error in constructing IETF JSON tree from config struct: %v", err)
 			log.Error(msg)
 			return nil, status.Error(codes.Internal, msg)
 		}
 	} else {
-		var err error
-		if nodeVal, err = value.ToScalar(val); err != nil {
-			return nil, status.Errorf(codes.Internal, "cannot convert leaf node to scalar type: %v", err)
+		if val.GetJsonIetfVal() == nil {
+			nodeVal, err = value.ToScalar(val)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "cannot convert leaf node to scalar type: %v", err)
+			}
+		} else {
+			// Unmarshal json data to gotVal container for comparison
+			if err := json.Unmarshal(val.GetJsonIetfVal(), &nodeVal); err != nil {
+				return nil, status.Errorf(codes.Internal, "error in unmarshaling IETF JSON data to json container: %v", err)
+			}
 		}
 	}
 
@@ -427,7 +434,7 @@ func (s *Server) Capabilities(ctx context.Context, req *pb.CapabilityRequest) (*
 	}, nil
 }
 
-func InspectStructV(val reflect.Value) (*pb.TypedValue, error) {
+func inspectUnderlyingTypeValue(val reflect.Value) (*pb.TypedValue, error) {
 	if val.Kind() == reflect.Interface && !val.IsNil() {
 		elm := val.Elem()
 		if elm.Kind() == reflect.Ptr && !elm.IsNil() && elm.Elem().Kind() == reflect.Ptr {
@@ -440,9 +447,6 @@ func InspectStructV(val reflect.Value) (*pb.TypedValue, error) {
 
 	for i := 0; i < val.NumField(); i++ {
 		valueField := val.Field(i)
-		typeField := val.Type().Field(i)
-		address := "not-addressable"
-
 		if valueField.Kind() == reflect.Interface && !valueField.IsNil() {
 			elm := valueField.Elem()
 			if elm.Kind() == reflect.Ptr && !elm.IsNil() && elm.Elem().Kind() == reflect.Ptr {
@@ -454,36 +458,48 @@ func InspectStructV(val reflect.Value) (*pb.TypedValue, error) {
 			valueField = valueField.Elem()
 
 		}
-		if valueField.CanAddr() {
-			address = fmt.Sprintf("0x%X", valueField.Addr().Pointer())
-		}
 
-		fmt.Printf("Field Name: %s,\t Field Value: %v,\t Address: %v\t, Field type: %v\t, Field kind: %v\n", typeField.Name,
-			valueField.Interface(), address, typeField.Type, valueField.Kind())
+		// typeField := val.Type().Field(i)
+		// address := "not-addressable"
+		// if valueField.CanAddr() {
+		// 	address = fmt.Sprintf("0x%X", valueField.Addr().Pointer())
+		// }
+		// fmt.Printf("Field Name: %s,\t Field Value: %v,\t Address: %v\t, Field type: %v\t, Field kind: %v\n", typeField.Name,
+		// 	valueField.Interface(), address, typeField.Type, valueField.Kind())
 
 		if valueField.Kind() == reflect.Struct {
-			InspectStructV(valueField)
+			inspectUnderlyingTypeValue(valueField)
 		}
 
-		// TODO: Check if reflected type is uint16
-		// switch t.Elem().Kind() {  // type of the slice element
-		// 	case reflect.Int:
-		// 		// Handle int case
-		// 	case reflect.String:
-		// 		// Handle string case
-		// 	...
-		// 	default:
-		// 		// custom types or structs must be explicitly typed
-		// 		// using calls to reflect.TypeOf on the defined type.
-		// }
-		return &pb.TypedValue{Value: &pb.TypedValue_UintVal{UintVal: uint64(valueField.Interface().(uint16))}}, nil
+		switch valueField.Kind() {
+		case reflect.Int8:
+			return &pb.TypedValue{Value: &pb.TypedValue_IntVal{IntVal: int64(valueField.Interface().(int8))}}, nil
+		case reflect.Int16:
+			return &pb.TypedValue{Value: &pb.TypedValue_IntVal{IntVal: int64(valueField.Interface().(int16))}}, nil
+		case reflect.Int32:
+			return &pb.TypedValue{Value: &pb.TypedValue_IntVal{IntVal: int64(valueField.Interface().(int32))}}, nil
+		case reflect.Int64:
+			return &pb.TypedValue{Value: &pb.TypedValue_IntVal{IntVal: int64(valueField.Interface().(int64))}}, nil
+		case reflect.Uint8:
+			return &pb.TypedValue{Value: &pb.TypedValue_UintVal{UintVal: uint64(valueField.Interface().(uint8))}}, nil
+		case reflect.Uint16:
+			return &pb.TypedValue{Value: &pb.TypedValue_UintVal{UintVal: uint64(valueField.Interface().(uint16))}}, nil
+		case reflect.Uint32:
+			return &pb.TypedValue{Value: &pb.TypedValue_UintVal{UintVal: uint64(valueField.Interface().(uint32))}}, nil
+		case reflect.Uint64:
+			return &pb.TypedValue{Value: &pb.TypedValue_UintVal{UintVal: uint64(valueField.Interface().(uint64))}}, nil
+		case reflect.String:
+			return &pb.TypedValue{Value: &pb.TypedValue_StringVal{StringVal: valueField.Interface().(string)}}, nil
+		default:
+			return nil, fmt.Errorf("element %v does not contain a scalar type value", valueField)
+		}
 	}
 
 	return nil, nil
 }
 
-func InspectStruct(v interface{}) (*pb.TypedValue, error) {
-	return InspectStructV(reflect.ValueOf(v))
+func getUnderlyingTypeValue(v interface{}) (*pb.TypedValue, error) {
+	return inspectUnderlyingTypeValue(reflect.ValueOf(v))
 }
 
 // Get implements the Get RPC in gNMI spec.
@@ -544,19 +560,15 @@ func (s *Server) Get(ctx context.Context, req *pb.GetRequest) (*pb.GetResponse, 
 			case reflect.Slice:
 				t := reflect.ValueOf(node)
 				sa := &pb.ScalarArray{Element: make([]*pb.TypedValue, t.Len())}
-				log.Infof("Num of elements: %d", t.Len())
-				log.Infof("Type of element: %s", t.Index(0).Type().Name())
 				var err error
 				for i := 0; i < t.Len(); i++ {
-					sa.Element[i], err = InspectStruct(t.Index(i).Interface())
+					sa.Element[i], err = getUnderlyingTypeValue(t.Index(i).Interface())
 					if err != nil {
-						msg := fmt.Sprintf("leaf node %v has a problem with reflect element type: %v", path, err)
+						msg := fmt.Sprintf("leaf node %v has a problem with reflect an element type: %v", path, err)
 						log.Error(msg)
 						return nil, status.Error(codes.Internal, msg)
 					}
-					log.Infof("Get element: %v", sa.Element[i])
 				}
-				log.Infof("Content of result: %v", sa.GetElement())
 				val = &pb.TypedValue{
 					Value: &pb.TypedValue_LeaflistVal{
 						LeaflistVal: sa,
