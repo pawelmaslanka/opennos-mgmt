@@ -453,7 +453,21 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 		if countChanges <= 0 {
 			break
 		}
+		if cnt, err = this.processSetAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
 		if cnt, err = this.processSetNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		if cnt, err = this.processSetTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
 		countChanges -= cnt

@@ -36,7 +36,7 @@ func isChangedNativeVlan(change *diff.Change) bool {
 }
 
 func isChangedTrunkVlan(change *diff.Change) bool {
-	if len(change.Path) != cmd.TrunkVlanEthPathItemsCountC {
+	if (len(change.Path) != cmd.TrunkVlanEthPathItemsCountC) && (len(change.Path) != cmd.TrunkVlanEthPathItemsCountIfUpdateC) {
 		return false
 	}
 
@@ -48,6 +48,20 @@ func isChangedTrunkVlan(change *diff.Change) bool {
 }
 
 func doFindsetVlanModeEthIntfChange(changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, bool) {
+	return nil, false
+}
+
+func doFindSetAccessVlanEthIntfChange(changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, bool) {
+	for _, ch := range changelog.Changes {
+		if !ch.IsProcessed() {
+			if ch.Change.Type == diff.CREATE {
+				if isChangedAccessVlan(ch.Change) {
+					return ch, true
+				}
+			}
+		}
+	}
+
 	return nil, false
 }
 
@@ -93,6 +107,20 @@ func doFindDeleteNativeVlanEthIntfChange(changelog *DiffChangelogMgmtT) (*DiffCh
 	return nil, false
 }
 
+func doFindSetTrunkVlanEthIntfChange(changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, bool) {
+	for _, ch := range changelog.Changes {
+		if !ch.IsProcessed() {
+			if ch.Change.Type == diff.CREATE {
+				if isChangedTrunkVlan(ch.Change) {
+					return ch, true
+				}
+			}
+		}
+	}
+
+	return nil, false
+}
+
 func doFindDeleteTrunkVlanEthIntfChange(changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, bool) {
 	for _, ch := range changelog.Changes {
 		if !ch.IsProcessed() {
@@ -107,8 +135,12 @@ func doFindDeleteTrunkVlanEthIntfChange(changelog *DiffChangelogMgmtT) (*DiffCha
 	return nil, false
 }
 
-func findsetVlanModeEthIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
+func findSetVlanModeEthIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
 	return doFindSetNativeVlanEthIntfChange(changelog)
+}
+
+func findSetAccessVlanEthIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
+	return doFindSetAccessVlanEthIntfChange(changelog)
 }
 
 func findDeleteAccessVlanEthIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
@@ -121,6 +153,10 @@ func findSetNativeVlanEthIntfChange(changelog *DiffChangelogMgmtT) (change *Diff
 
 func findDeleteNativeVlanEthIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
 	return doFindDeleteNativeVlanEthIntfChange(changelog)
+}
+
+func findSetTrunkVlanEthIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
+	return doFindSetTrunkVlanEthIntfChange(changelog)
 }
 
 func findDeleteTrunkVlanEthIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
@@ -143,6 +179,52 @@ func extractVlanIdFromInterface(vlanId interface{}) (lib.VidT, error) {
 	}
 
 	return vid, nil
+}
+
+func (this *ConfigMngrT) validateSetAccessVlanEthIntfChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+	ifname := changeItem.Change.Path[cmd.VlanEthIfnamePathItemIdxC]
+	if !this.isEthIntfAvailable(ifname) {
+		return fmt.Errorf("Ethernet interface %s is not available", ifname)
+	}
+
+	vid, err := extractVlanIdFromInterface(changeItem.Change.To)
+	if err != nil {
+		return err
+	}
+	vlanModeChange, exists := findSetVlanModeEthIntfChange(changelog)
+	if exists {
+		reqVlanMode := oc.E_OpenconfigVlan_VlanModeType(*vlanModeChange.Change.To.(*uint8))
+		if reqVlanMode != oc.OpenconfigVlan_VlanModeType_TRUNK {
+			return fmt.Errorf("Set access VLAN %d for Ethernet interface %s is disallowed if VLAN interface mode is not going to be access.\nRequested mode: %v", vid, ifname, reqVlanMode)
+		}
+	} else {
+		vlanMode, err := this.transConfigLookupTbl.getVlanModeEthIntf(ifname)
+		if err != nil {
+			return fmt.Errorf("Could not determine VLAN mode on Ethernet interface %s", ifname)
+		}
+
+		if vlanMode != oc.OpenconfigVlan_VlanModeType_ACCESS {
+			return fmt.Errorf("Set access VLAN %d for Ethernet interface %s is disallowed if VLAN interface mode is not access. Current mode: %v", vid, ifname, vlanMode)
+		}
+	}
+
+	log.Infof("Requested set access VLAN %d for Ethernet interface %s", vid, ifname)
+	setAccessVlanEthIntfCmd := cmd.NewSetAccessVlanEthIntfCmdT(changeItem.Change, this.ethSwitchMgmtClient)
+	if err := this.transConfigLookupTbl.checkDependenciesForSetAccessVlanForEthIntf(ifname, vid); err != nil {
+		return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
+			setAccessVlanEthIntfCmd.GetName(), ifname, err)
+	}
+
+	if this.transHasBeenStarted {
+		if err := this.appendCmdToTransactionByIfname(ifname, setAccessVlanEthIntfCmd, setAccessVlanForEthIntfC); err != nil {
+			return err
+		}
+
+		this.transConfigLookupTbl.setAccessVlanEthIntf(ifname, vid)
+		changeItem.MarkAsProcessed()
+	}
+
+	return nil
 }
 
 func (this *ConfigMngrT) validateDeleteAccessVlanEthIntfChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
@@ -203,7 +285,7 @@ func (this *ConfigMngrT) validateSetNativeVlanEthIntfChange(changeItem *DiffChan
 	if err != nil {
 		return err
 	}
-	vlanModeChange, exists := findsetVlanModeEthIntfChange(changelog)
+	vlanModeChange, exists := findSetVlanModeEthIntfChange(changelog)
 	if exists {
 		reqVlanMode := oc.E_OpenconfigVlan_VlanModeType(*vlanModeChange.Change.To.(*uint8))
 		if reqVlanMode != oc.OpenconfigVlan_VlanModeType_TRUNK {
@@ -287,6 +369,56 @@ func (this *ConfigMngrT) validateDeleteNativeVlanEthIntfChange(changeItem *DiffC
 	return nil
 }
 
+func (this *ConfigMngrT) validateSetTrunkVlanEthIntfChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+	ifname := changeItem.Change.Path[cmd.VlanEthIfnamePathItemIdxC]
+	if !this.isEthIntfAvailable(ifname) {
+		return fmt.Errorf("Ethernet interface %s is not available", ifname)
+	}
+
+	vid, err := extractVlanIdFromInterface(changeItem.Change.To)
+	if err != nil {
+		return err
+	}
+
+	vlanModeChange, exists := findSetVlanModeEthIntfChange(changelog)
+	if exists {
+		reqVlanMode := oc.E_OpenconfigVlan_VlanModeType(*vlanModeChange.Change.To.(*uint8))
+		if reqVlanMode != oc.OpenconfigVlan_VlanModeType_TRUNK {
+			return fmt.Errorf("Set trunk VLAN %d for Ethernet interface %s is disallowed if VLAN interface mode is not going to be trunk.\nRequested mode: %v", vid, ifname, reqVlanMode)
+		}
+	} else {
+		vlanMode, err := this.transConfigLookupTbl.getVlanModeEthIntf(ifname)
+		if err != nil {
+			return fmt.Errorf("Could not determine VLAN mode on Ethernet interface %s", ifname)
+		}
+
+		if vlanMode != oc.OpenconfigVlan_VlanModeType_TRUNK {
+			return fmt.Errorf("Set trunk VLAN %d for Ethernet interface %s is disallowed if VLAN interface mode is not trunk. Current mode: %v", vid, ifname, vlanMode)
+		}
+	}
+
+	log.Infof("Requested set trunk VLAN %d from Ethernet interface %s", vid, ifname)
+	setTrunkVlanEthIntfCmd := cmd.NewSetTrunkVlanEthIntfCmdT(changeItem.Change, this.ethSwitchMgmtClient)
+	if err := this.transConfigLookupTbl.checkDependenciesForSetTrunkVlanForEthIntf(ifname, vid); err != nil {
+		return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
+			setTrunkVlanEthIntfCmd.GetName(), ifname, err)
+	}
+
+	if this.transHasBeenStarted {
+		if err = this.appendCmdToTransactionByIfname(ifname, setTrunkVlanEthIntfCmd, setTrunkVlanForEthIntfC); err != nil {
+			return err
+		}
+
+		if err := this.transConfigLookupTbl.setTrunkVlanEthIntf(ifname, vid); err != nil {
+			return err
+		}
+
+		changeItem.MarkAsProcessed()
+	}
+
+	return nil
+}
+
 func (this *ConfigMngrT) validateDeleteTrunkVlanEthIntfChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
 	ifname := changeItem.Change.Path[cmd.VlanEthIfnamePathItemIdxC]
 	if !this.isEthIntfAvailable(ifname) {
@@ -323,7 +455,7 @@ func (this *ConfigMngrT) validateDeleteTrunkVlanEthIntfChange(changeItem *DiffCh
 		// in order to process new native VLAN it by SetTrunkVlanEthIntfCmd
 		if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
 			var newChange diff.Change
-			copier.Copy(newChange, changeItem.Change)
+			copier.Copy(&newChange, changeItem.Change)
 			newChange.Type = diff.CREATE
 			newChange.From = nil
 			// Let's drop "Uint16"/"String"
@@ -335,6 +467,24 @@ func (this *ConfigMngrT) validateDeleteTrunkVlanEthIntfChange(changeItem *DiffCh
 	}
 
 	return nil
+}
+
+func (this *ConfigMngrT) processSetAccessVlanEthIntfFromChangelog(changelog *DiffChangelogMgmtT) (int, error) {
+	var count int = 0
+	for {
+		// Repeat till there is not any change related to set native VLAN for Ethernet interface
+		if change, exists := findSetAccessVlanEthIntfChange(changelog); exists {
+			if err := this.validateSetAccessVlanEthIntfChange(change, changelog); err != nil {
+				return 0, err
+			}
+
+			count++
+		} else {
+			break
+		}
+	}
+
+	return count, nil
 }
 
 func (this *ConfigMngrT) processDeleteAccessVlanEthIntfFromChangelog(changelog *DiffChangelogMgmtT) (int, error) {
@@ -379,6 +529,24 @@ func (this *ConfigMngrT) processDeleteNativeVlanEthIntfFromChangelog(changelog *
 		// Repeat till there is not any change related to delete native VLAN from Ethernet interface
 		if change, exists := findDeleteNativeVlanEthIntfChange(changelog); exists {
 			if err := this.validateDeleteNativeVlanEthIntfChange(change, changelog); err != nil {
+				return 0, err
+			}
+
+			count++
+		} else {
+			break
+		}
+	}
+
+	return count, nil
+}
+
+func (this *ConfigMngrT) processSetTrunkVlanEthIntfFromChangelog(changelog *DiffChangelogMgmtT) (int, error) {
+	var count int = 0
+	for {
+		// Repeat till there is not any change related to set trunk VLAN for Ethernet interface
+		if change, exists := findSetTrunkVlanEthIntfChange(changelog); exists {
+			if err := this.validateSetTrunkVlanEthIntfChange(change, changelog); err != nil {
 				return 0, err
 			}
 

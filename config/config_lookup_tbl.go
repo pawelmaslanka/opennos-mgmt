@@ -209,6 +209,32 @@ func (this *configLookupTablesT) checkDependenciesForDeleteIpv4AddrFromEthIntf(i
 	return errors.New(strBuilder.String())
 }
 
+func (this *configLookupTablesT) checkDependenciesForSetAccessVlanForEthIntf(ifname string, setVid lib.VidT) error {
+	var err error
+	strBuilder := strings.Builder{}
+	intfIdx := this.idxByEthName[ifname]
+
+	if accessVid, exists := this.vlanAccessByEth[intfIdx]; exists {
+		if accessVid == setVid {
+			msg := fmt.Sprintf("Access VLAN %d is already configured on Ethernet interface %s", setVid, ifname)
+			if _, err = strBuilder.WriteString(msg); err != nil {
+				return err
+			}
+		} else {
+			msg := fmt.Sprintf("There is other native VLAN %d configured on Ethernet interface %s", accessVid, ifname)
+			if _, err = strBuilder.WriteString(msg); err != nil {
+				return err
+			}
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
 func (this *configLookupTablesT) checkDependenciesForDeleteAccessVlanFromEthIntf(ifname string, deleteVid lib.VidT) error {
 	var err error
 	strBuilder := strings.Builder{}
@@ -305,6 +331,27 @@ func (this *configLookupTablesT) checkDependenciesForDeleteNativeVlanFromEthIntf
 		msg := fmt.Sprintf("There is not set trunk VLAN mode on interface %s. Current mode: %v", ifname, vlanMode)
 		if _, err = strBuilder.WriteString(msg); err != nil {
 			return err
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
+func (this *configLookupTablesT) checkDependenciesForSetTrunkVlanForEthIntf(ifname string, setVid lib.VidT) error {
+	var err error
+	strBuilder := strings.Builder{}
+	intfIdx := this.idxByEthName[ifname]
+
+	if trunkVids, exists := this.vlanTrunkByEth[intfIdx]; exists {
+		if trunkVids.Has(setVid) {
+			msg := fmt.Sprintf("Trunk VLAN %d is already configured on Ethernet interface %s", setVid, ifname)
+			if _, err = strBuilder.WriteString(msg); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -489,6 +536,26 @@ func (this *configLookupTablesT) deleteNativeVlanEthIntf(ifname string, vidDelet
 	return nil
 }
 
+func (table *configLookupTablesT) setTrunkVlanEthIntf(ifname string, vid lib.VidT) error {
+	ethIdx, exists := table.idxByEthName[ifname]
+	if !exists {
+		return fmt.Errorf("Not found index of EThernet interface %s", ifname)
+	}
+
+	if _, exists := table.vlanTrunkByEth[table.idxByEthName[ifname]]; !exists {
+		table.vlanTrunkByEth[ethIdx] = lib.NewVidTSet()
+	}
+	table.vlanTrunkByEth[ethIdx].Add(vid)
+
+	if _, exists := table.ethByVlanTrunk[vid]; !exists {
+		table.ethByVlanTrunk[vid] = lib.NewIdxTSet()
+	}
+
+	table.ethByVlanTrunk[vid].Add(ethIdx)
+	log.Infof("Set trunk VLAN %d on Ethernet interface %s", vid, ifname)
+	return nil
+}
+
 func (this *configLookupTablesT) deleteTrunkVlanEthIntf(ifname string, vidDelete lib.VidT) error {
 	intfIdx, exists := this.idxByEthName[ifname]
 	if !exists {
@@ -506,7 +573,7 @@ func (this *configLookupTablesT) deleteTrunkVlanEthIntf(ifname string, vidDelete
 	return nil
 }
 
-func (table *configLookupTablesT) setAccessVlanOnPort(ifname string, vid lib.VidT) {
+func (table *configLookupTablesT) setAccessVlanEthIntf(ifname string, vid lib.VidT) {
 	// TODO: Add asserts for checking if LAG exists in map
 	table.vlanAccessByEth[table.idxByEthName[ifname]] = vid
 	if _, exists := table.ethByVlanAccess[vid]; !exists {
@@ -756,7 +823,7 @@ func (t *configLookupTablesT) parseVlanForIntf(ifname string, swVlan *oc.Interfa
 	if intfMode == oc.OpenconfigVlan_VlanModeType_ACCESS {
 		vid := lib.VidT(swVlan.GetAccessVlan())
 		if vid != 0 {
-			t.setAccessVlanOnPort(ifname, vid)
+			t.setAccessVlanEthIntf(ifname, vid)
 			log.Infof("Set access VLAN %d for interface %s", vid, ifname)
 		} else {
 			return fmt.Errorf("Failed to parse VLAN on interface %s in access mode", ifname)
