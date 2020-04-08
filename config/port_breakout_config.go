@@ -161,7 +161,7 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChange(ch *DiffChangeMgmt
 
 	if this.transHasBeenStarted {
 		setPortBreakoutChanSpeedCmd := cmd.NewSetPortBreakoutChanSpeedCmdT(ch.Change, this.ethSwitchMgmtClient)
-		if err := this.appendSetPortBreakoutChanSpeedCmdToTransaction(ifname, setPortBreakoutChanSpeedCmd); err != nil {
+		if err := this.appendCmdToTransactionByIfname(ifname, setPortBreakoutChanSpeedCmd, setPortBreakoutChanSpeedC); err != nil {
 			return err
 		}
 
@@ -171,37 +171,8 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChange(ch *DiffChangeMgmt
 	return nil
 }
 
-func (this *ConfigMngrT) appendSetPortBreakoutCmdToTransaction(ifname string, cmdToAdd *cmd.SetPortBreakoutCmdT) error {
-	setPortBreakoutCmds := this.cmdByIfname[setPortBreakoutC]
-	for _, setPortBreakoutCmd := range setPortBreakoutCmds {
-		if setPortBreakoutCmd.Equals(cmdToAdd) {
-			return fmt.Errorf("Command %q already exists in transaction", cmdToAdd.GetName())
-		}
-	}
-
-	log.Infof("Append command %q to transaction", cmdToAdd.GetName())
-
-	setPortBreakoutCmds[ifname] = cmdToAdd
-	return nil
-}
-
-func (this *ConfigMngrT) appendSetPortBreakoutChanSpeedCmdToTransaction(ifname string, cmdToAdd *cmd.SetPortBreakoutChanSpeedCmdT) error {
-	setPortBreakoutChanSpeedCmds := this.cmdByIfname[setPortBreakoutChanSpeedC]
-	for _, setPortBreakoutChanSpeedCmd := range setPortBreakoutChanSpeedCmds {
-		if setPortBreakoutChanSpeedCmd.Equals(cmdToAdd) {
-			return fmt.Errorf("Command %q already exists in transaction", cmdToAdd.GetName())
-		}
-	}
-
-	log.Infof("Append command %q to transaction", cmdToAdd.GetName())
-
-	setPortBreakoutChanSpeedCmds[ifname] = cmdToAdd
-	this.addCmdToListTrans(cmdToAdd)
-	return nil
-}
-
 func (this *ConfigMngrT) isEthIntfGoingToBeAvailableAfterPortBreakout(ifname string) bool {
-	if _, exists := this.transConfigLookupTbl.idxByIntfName[ifname]; exists {
+	if _, exists := this.transConfigLookupTbl.idxByEthName[ifname]; exists {
 		return true
 	}
 
@@ -300,7 +271,7 @@ func (this *ConfigMngrT) validatePortBreakoutChange(changedItem *DiffChangeMgmtT
 
 	if this.transHasBeenStarted {
 		setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
-		if err = this.appendSetPortBreakoutCmdToTransaction(ifname, setPortBreakoutCmd); err != nil {
+		if err = this.appendCmdToTransactionByIfname(ifname, setPortBreakoutCmd, setPortBreakoutC); err != nil {
 			return err
 		}
 

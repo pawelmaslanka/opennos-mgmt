@@ -72,7 +72,7 @@ func (cmd *commandT) createErrorAccordingToExecutionState() error {
 }
 
 func (cmd *commandT) dumpInternalData() {
-	log.Infof("Dump internal data of command %q", cmd.name)
+	log.Infof("Dump internal data of command \n=== %q ===", cmd.name)
 	log.Infoln("Change(s) to apply:")
 	indent := "    "
 	for _, ch := range cmd.changes {

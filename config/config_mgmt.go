@@ -48,7 +48,8 @@ const (
 	setIpv4AddrForLagIntfC                          // Assign IPv4/CIDRv4 address to LAG interface
 	setIpv6AddrForEthIntfC                          // Assign IPv6/CIDRv6 address to Ethernet interface
 	setIpv6AddrForLagIntfC                          // Assign IPv6/CIDRv6 address to LAG interface
-	setVlanIntfModeOfLagIntfC                       // Set VLAN interface mode
+	setVlanIntfModeForEthIntfC                      // Set VLAN interface mode for Ethernet interface
+	setVlanIntfModeForLagIntfC                      // Set VLAN interface mode for LAG interface
 	setAccessVlanForEthIntfC                        // Assign Ethernet interface to access VLAN
 	setAccessVlanForLagIntfC                        // Assign LAG interface to access VLAN
 	setNativeVlanForEthIntfC                        // Assign Ethernet interface to native VLAN
@@ -253,7 +254,7 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 		}
 	}
 
-	for intfName, _ := range this.configLookupTbl.idxByIntfName {
+	for intfName, _ := range this.configLookupTbl.idxByEthName {
 		intf := device.Interface[intfName]
 		if intf == nil {
 			log.Info("Cannot find interface ", intfName)
@@ -310,6 +311,21 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 	return this.CommitCandidateConfig(&configModel)
 }
 
+func (this *ConfigMngrT) appendCmdToTransactionByIfname(ifname string, cmdAdd cmd.CommandI, idx OrdinalNumberT) error {
+	cmds := this.cmdByIfname[idx]
+	for _, command := range cmds {
+		if command.Equals(cmdAdd) {
+			return fmt.Errorf("Command %q already exists in transaction", command.GetName())
+		}
+	}
+
+	log.Infof("Append command %q to transaction", cmdAdd.GetName())
+
+	cmds[ifname] = cmdAdd
+	this.addCmdToListTrans(cmdAdd)
+	return nil
+}
+
 func (this *ConfigMngrT) IsChangedIpv4AddrEth(change *diff.Change) bool {
 	if len(change.Path) < cmd.Ipv4AddrEthPathItemsCountC {
 		return false
@@ -359,7 +375,7 @@ func (this *ConfigMngrT) GetDiffRunningConfigWithCandidateConfig(candidateConfig
 }
 
 func (this *ConfigMngrT) isEthIntfAvailable(ifname string) bool {
-	if _, exists := this.configLookupTbl.idxByIntfName[ifname]; exists {
+	if _, exists := this.configLookupTbl.idxByEthName[ifname]; exists {
 		return true
 	}
 
@@ -394,6 +410,27 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 		if countChanges <= 0 {
 			break
 		}
+		if cnt, err = this.processDeleteAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		if cnt, err = this.processDeleteNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		if cnt, err = this.processDeleteTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
 		// Set section
 		if cnt, err = this.processSetPortBreakoutFromChangelog(diffChangelog); err != nil {
 			return err
@@ -410,6 +447,13 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 			break
 		}
 		if cnt, err = this.processSetIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		if cnt, err = this.processSetNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
 		countChanges -= cnt

@@ -14,7 +14,7 @@ import (
 
 type configLookupTablesT struct {
 	idxOfLastAddedIntf lib.IdxT
-	idxByIntfName      map[string]lib.IdxT
+	idxByEthName       map[string]lib.IdxT
 	intfNameByIdx      map[lib.IdxT]string
 	idxOfLastAddedLag  lib.IdxT
 	idxByLagName       map[string]lib.IdxT
@@ -24,43 +24,45 @@ type configLookupTablesT struct {
 	vlanNameByIdx      map[lib.IdxT]string
 
 	// L3 interface can have assigned many IPv4 addresses
-	ipv4AddrByIntf map[lib.IdxT]*lib.StringSet
+	ipv4AddrByEth map[lib.IdxT]*lib.StringSet
 	// L3 LAG can have assigned many IPv4 addresses
 	ipv4AddrByLag map[lib.IdxT]*lib.StringSet
 	// L3 VLAN can have assigned many IPv4 addresses
 	ipv4AddrByVlan map[lib.VidT]*lib.StringSet
-	intfByIpv4Addr map[string]lib.IdxT
+	ethByIpv4Addr  map[string]lib.IdxT
 	lagByIpv4Addr  map[string]lib.IdxT
 	vlanByIpv4Addr map[string]lib.VidT
-	ipv6AddrByIntf map[lib.IdxT]*lib.StringSet
+	ipv6AddrByEth  map[lib.IdxT]*lib.StringSet
 	ipv6AddrByLag  map[lib.IdxT]*lib.StringSet
 	ipv6AddrByVlan map[lib.VidT]*lib.StringSet
 	// L3 interface can have assigned many IPv6 addresses
-	intfByIpv6Addr map[string]lib.IdxT
+	ethByIpv6Addr map[string]lib.IdxT
 	// L3 LAG can have assigned many IPv6 addresses
 	lagByIpv6Addr map[string]lib.IdxT
 	// L3 VLAN interface can have assigned many IPv6 addresses
 	vlanByIpv6Addr map[string]lib.VidT
-	lagByIntf      map[lib.IdxT]lib.IdxT
+	lagByEth       map[lib.IdxT]lib.IdxT
 	// LAG can have many interface members
-	intfByLag        map[lib.IdxT]*lib.IdxTSet
-	stpByIntf        *lib.IdxTSet
-	vlanAccessByIntf map[lib.IdxT]lib.VidT
+	ethByLag        map[lib.IdxT]*lib.IdxTSet
+	stpByEth        *lib.IdxTSet
+	vlanModeByEth   map[lib.IdxT]oc.E_OpenconfigVlan_VlanModeType
+	vlanModeByLag   map[lib.IdxT]oc.E_OpenconfigVlan_VlanModeType
+	vlanAccessByEth map[lib.IdxT]lib.VidT
 	// There can be many ports in specific VLAN ID for access mode
-	intfByVlanAccess map[lib.VidT]*lib.IdxTSet
-	vlanAccessByLag  map[lib.IdxT]lib.VidT
+	ethByVlanAccess map[lib.VidT]*lib.IdxTSet
+	vlanAccessByLag map[lib.IdxT]lib.VidT
 	// There can be many LAGs in specific VLAN ID for access mode
-	lagByVlanAccess  map[lib.VidT]*lib.IdxTSet
-	vlanNativeByIntf map[lib.IdxT]lib.VidT
+	lagByVlanAccess map[lib.VidT]*lib.IdxTSet
+	vlanNativeByEth map[lib.IdxT]lib.VidT
 	// There can be many ports in specific VLAN ID for native tag
-	intfByVlanNative map[lib.VidT]*lib.IdxTSet
-	vlanNativeByLag  map[lib.IdxT]lib.VidT
+	ethByVlanNative map[lib.VidT]*lib.IdxTSet
+	vlanNativeByLag map[lib.IdxT]lib.VidT
 	// There can be many LAGs in specific VLAN ID for native tag
 	lagByVlanNative map[lib.VidT]*lib.IdxTSet
-	vlanTrunkByIntf map[lib.IdxT]*lib.VidTSet
+	vlanTrunkByEth  map[lib.IdxT]*lib.VidTSet
 	// There can be many ports in VLAN trunk
-	intfByVlanTrunk map[lib.VidT]*lib.IdxTSet
-	vlanTrunkByLag  map[lib.IdxT]*lib.VidTSet
+	ethByVlanTrunk map[lib.VidT]*lib.IdxTSet
+	vlanTrunkByLag map[lib.IdxT]*lib.VidTSet
 	// There can be many LAGs in VLAN trunk
 	lagByVlanTrunk map[lib.VidT]*lib.IdxTSet
 }
@@ -68,7 +70,7 @@ type configLookupTablesT struct {
 func newConfigLookupTables() *configLookupTablesT {
 	return &configLookupTablesT{
 		idxOfLastAddedIntf: 0,
-		idxByIntfName:      make(map[string]lib.IdxT, maxPortsC),
+		idxByEthName:       make(map[string]lib.IdxT, maxPortsC),
 		intfNameByIdx:      make(map[lib.IdxT]string, maxPortsC),
 		idxOfLastAddedLag:  0,
 		idxByLagName:       make(map[string]lib.IdxT),
@@ -76,38 +78,40 @@ func newConfigLookupTables() *configLookupTablesT {
 		idxOfLastAddedVlan: 0,
 		idxByVlanName:      make(map[string]lib.IdxT),
 		vlanNameByIdx:      make(map[lib.IdxT]string),
-		ipv4AddrByIntf:     make(map[lib.IdxT]*lib.StringSet),
+		ipv4AddrByEth:      make(map[lib.IdxT]*lib.StringSet),
 		ipv4AddrByLag:      make(map[lib.IdxT]*lib.StringSet),
 		ipv4AddrByVlan:     make(map[lib.VidT]*lib.StringSet),
-		intfByIpv4Addr:     make(map[string]lib.IdxT),
+		ethByIpv4Addr:      make(map[string]lib.IdxT),
 		lagByIpv4Addr:      make(map[string]lib.IdxT),
 		vlanByIpv4Addr:     make(map[string]lib.VidT),
-		ipv6AddrByIntf:     make(map[lib.IdxT]*lib.StringSet),
+		ipv6AddrByEth:      make(map[lib.IdxT]*lib.StringSet),
 		ipv6AddrByLag:      make(map[lib.IdxT]*lib.StringSet),
 		ipv6AddrByVlan:     make(map[lib.VidT]*lib.StringSet),
-		intfByIpv6Addr:     make(map[string]lib.IdxT),
+		ethByIpv6Addr:      make(map[string]lib.IdxT),
 		lagByIpv6Addr:      make(map[string]lib.IdxT),
 		vlanByIpv6Addr:     make(map[string]lib.VidT),
-		lagByIntf:          make(map[lib.IdxT]lib.IdxT),
-		intfByLag:          make(map[lib.IdxT]*lib.IdxTSet),
-		stpByIntf:          lib.NewIdxTSet(),
-		vlanAccessByIntf:   make(map[lib.IdxT]lib.VidT),
+		lagByEth:           make(map[lib.IdxT]lib.IdxT),
+		ethByLag:           make(map[lib.IdxT]*lib.IdxTSet),
+		stpByEth:           lib.NewIdxTSet(),
+		vlanModeByEth:      make(map[lib.IdxT]oc.E_OpenconfigVlan_VlanModeType),
+		vlanModeByLag:      make(map[lib.IdxT]oc.E_OpenconfigVlan_VlanModeType),
+		vlanAccessByEth:    make(map[lib.IdxT]lib.VidT),
 		vlanAccessByLag:    make(map[lib.IdxT]lib.VidT),
-		intfByVlanAccess:   make(map[lib.VidT]*lib.IdxTSet),
+		ethByVlanAccess:    make(map[lib.VidT]*lib.IdxTSet),
 		lagByVlanAccess:    make(map[lib.VidT]*lib.IdxTSet),
-		vlanNativeByIntf:   make(map[lib.IdxT]lib.VidT),
+		vlanNativeByEth:    make(map[lib.IdxT]lib.VidT),
 		vlanNativeByLag:    make(map[lib.IdxT]lib.VidT),
-		intfByVlanNative:   make(map[lib.VidT]*lib.IdxTSet),
+		ethByVlanNative:    make(map[lib.VidT]*lib.IdxTSet),
 		lagByVlanNative:    make(map[lib.VidT]*lib.IdxTSet),
-		vlanTrunkByIntf:    make(map[lib.IdxT]*lib.VidTSet),
+		vlanTrunkByEth:     make(map[lib.IdxT]*lib.VidTSet),
 		vlanTrunkByLag:     make(map[lib.IdxT]*lib.VidTSet),
-		intfByVlanTrunk:    make(map[lib.VidT]*lib.IdxTSet),
+		ethByVlanTrunk:     make(map[lib.VidT]*lib.IdxTSet),
 		lagByVlanTrunk:     make(map[lib.VidT]*lib.IdxTSet),
 	}
 }
 
 func (this *configLookupTablesT) checkDependenciesForDeleteOrRemoveEthIntfFromLagIntf(ifname string, lagName string) error {
-	intfIdx, exists := this.idxByIntfName[ifname]
+	intfIdx, exists := this.idxByEthName[ifname]
 	if !exists {
 		return fmt.Errorf("Ethernet interface %s does not exists", ifname)
 	}
@@ -117,7 +121,7 @@ func (this *configLookupTablesT) checkDependenciesForDeleteOrRemoveEthIntfFromLa
 		return fmt.Errorf("LAG %s does not exists", lagName)
 	}
 
-	if this.lagByIntf[intfIdx] != expectedLagIdx {
+	if this.lagByEth[intfIdx] != expectedLagIdx {
 		return fmt.Errorf("Ethernet interface %s does not exists in LAG %s", ifname, lagName)
 	}
 
@@ -132,7 +136,7 @@ func (this *configLookupTablesT) checkDependenciesForDeleteOrRemoveLagIntf(lagNa
 		return fmt.Errorf("LAG %s does not exists", lagName)
 	}
 
-	if intfs, exists := this.intfByLag[lagIdx]; exists {
+	if intfs, exists := this.ethByLag[lagIdx]; exists {
 		if intfs.Size() > 0 {
 			if _, err = strBuilder.WriteString("LAG members:"); err != nil {
 				return err
@@ -160,7 +164,7 @@ func (this *configLookupTablesT) checkDependenciesForDeleteOrRemoveLagIntf(lagNa
 func (this *configLookupTablesT) checkDependenciesForSetIpv4AddrForEthIntf(ifname string, cidr4 string) error {
 	var err error
 	strBuilder := strings.Builder{}
-	intfIdx, exists := this.intfByIpv4Addr[cidr4]
+	intfIdx, exists := this.ethByIpv4Addr[cidr4]
 	if exists {
 		msg := fmt.Sprintf("IPv4 address %s is configured on Ethernet interface %s",
 			cidr4, this.intfNameByIdx[intfIdx])
@@ -179,8 +183,8 @@ func (this *configLookupTablesT) checkDependenciesForSetIpv4AddrForEthIntf(ifnam
 func (this *configLookupTablesT) checkDependenciesForDeleteIpv4AddrFromEthIntf(ifname string, cidr4 string) error {
 	var err error
 	strBuilder := strings.Builder{}
-	intfIdx := this.idxByIntfName[ifname]
-	allIpv4Addr, exists := this.ipv4AddrByIntf[intfIdx]
+	intfIdx := this.idxByEthName[ifname]
+	allIpv4Addr, exists := this.ipv4AddrByEth[intfIdx]
 	if !exists {
 		if _, err = strBuilder.WriteString(fmt.Sprintf("There is not any IPv4 address on Ethernet interface %s", ifname)); err != nil {
 			return err
@@ -191,9 +195,148 @@ func (this *configLookupTablesT) checkDependenciesForDeleteIpv4AddrFromEthIntf(i
 		}
 	}
 
-	foundIpIntfIdx, exists := this.intfByIpv4Addr[cidr4]
+	foundIpIntfIdx, exists := this.ethByIpv4Addr[cidr4]
 	if exists && foundIpIntfIdx != intfIdx {
 		if _, err = strBuilder.WriteString(fmt.Sprintf("IPv4 address %s is on Ethernet interface %s", cidr4, this.intfNameByIdx[intfIdx])); err != nil {
+			return err
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
+func (this *configLookupTablesT) checkDependenciesForDeleteAccessVlanFromEthIntf(ifname string, deleteVid lib.VidT) error {
+	var err error
+	strBuilder := strings.Builder{}
+	intfIdx := this.idxByEthName[ifname]
+
+	accessVid, exists := this.vlanAccessByEth[intfIdx]
+	if !exists {
+		msg := fmt.Sprintf("Access VLAN %d is not configured on Ethernet interface %s", deleteVid, ifname)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	} else if accessVid != deleteVid {
+		msg := fmt.Sprintf("Currently access VLAN %d is configured on Ethernet interface %s", accessVid, ifname)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	vlanMode, err := this.getVlanModeEthIntf(ifname)
+	if err != nil {
+		msg := fmt.Sprintf("%s", err)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	if vlanMode != oc.OpenconfigVlan_VlanModeType_ACCESS {
+		msg := fmt.Sprintf("There is not set access VLAN mode on interface %s. Current mode: %v", ifname, vlanMode)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
+func (this *configLookupTablesT) checkDependenciesForSetNativeVlanForEthIntf(ifname string, setVid lib.VidT) error {
+	var err error
+	strBuilder := strings.Builder{}
+	intfIdx := this.idxByEthName[ifname]
+
+	if nativeVid, exists := this.vlanNativeByEth[intfIdx]; exists {
+		if nativeVid == setVid {
+			msg := fmt.Sprintf("Native VLAN %d is already configured on Ethernet interface %s", setVid, ifname)
+			if _, err = strBuilder.WriteString(msg); err != nil {
+				return err
+			}
+		} else {
+			msg := fmt.Sprintf("There is other native VLAN %d configured on Ethernet interface %s", nativeVid, ifname)
+			if _, err = strBuilder.WriteString(msg); err != nil {
+				return err
+			}
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
+func (this *configLookupTablesT) checkDependenciesForDeleteNativeVlanFromEthIntf(ifname string, deleteVid lib.VidT) error {
+	var err error
+	strBuilder := strings.Builder{}
+	intfIdx := this.idxByEthName[ifname]
+
+	nativeVid, exists := this.vlanNativeByEth[intfIdx]
+	if !exists {
+		msg := fmt.Sprintf("Native VLAN %d is not configured on Ethernet interface %s", deleteVid, ifname)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	} else if nativeVid != deleteVid {
+		msg := fmt.Sprintf("Currently native VLAN %d is configured on Ethernet interface %s", nativeVid, ifname)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	vlanMode, err := this.getVlanModeEthIntf(ifname)
+	if err != nil {
+		msg := fmt.Sprintf("%s", err)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	if vlanMode != oc.OpenconfigVlan_VlanModeType_TRUNK {
+		msg := fmt.Sprintf("There is not set trunk VLAN mode on interface %s. Current mode: %v", ifname, vlanMode)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
+func (this *configLookupTablesT) checkDependenciesForDeleteTrunkVlanFromEthIntf(ifname string, deleteVid lib.VidT) error {
+	var err error
+	strBuilder := strings.Builder{}
+	intfIdx := this.idxByEthName[ifname]
+	if _, exists := this.vlanTrunkByEth[intfIdx]; !exists {
+		msg := fmt.Sprintf("Trunk VLAN %d is not configured on Ethernet interface %s", deleteVid, ifname)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	vlanMode, err := this.getVlanModeEthIntf(ifname)
+	if err != nil {
+		msg := fmt.Sprintf("%s", err)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	if vlanMode != oc.OpenconfigVlan_VlanModeType_TRUNK {
+		msg := fmt.Sprintf("There is not set trunk VLAN mode on interface %s. Current mode: %v", ifname, vlanMode)
+		if _, err = strBuilder.WriteString(msg); err != nil {
 			return err
 		}
 	}
@@ -208,8 +351,8 @@ func (this *configLookupTablesT) checkDependenciesForDeleteIpv4AddrFromEthIntf(i
 func (this *configLookupTablesT) checkDependenciesForDeletePortBreakout(ifname string) error {
 	var err error
 	strBuilder := strings.Builder{}
-	intfIdx := this.idxByIntfName[ifname]
-	if allIpv4Addr, exists := this.ipv4AddrByIntf[intfIdx]; exists {
+	intfIdx := this.idxByEthName[ifname]
+	if allIpv4Addr, exists := this.ipv4AddrByEth[intfIdx]; exists {
 		for _, ip4 := range allIpv4Addr.Strings() {
 			if _, err = strBuilder.WriteString("IPv4: " + ip4 + "\n"); err != nil {
 				return err
@@ -217,7 +360,7 @@ func (this *configLookupTablesT) checkDependenciesForDeletePortBreakout(ifname s
 		}
 	}
 
-	if allIpv6Addr, exists := this.ipv6AddrByIntf[intfIdx]; exists {
+	if allIpv6Addr, exists := this.ipv6AddrByEth[intfIdx]; exists {
 		for _, ip6 := range allIpv6Addr.Strings() {
 			if _, err = strBuilder.WriteString("IPv6: " + ip6 + "\n"); err != nil {
 				return err
@@ -225,19 +368,19 @@ func (this *configLookupTablesT) checkDependenciesForDeletePortBreakout(ifname s
 		}
 	}
 
-	if vid, exists := this.vlanAccessByIntf[intfIdx]; exists {
+	if vid, exists := this.vlanAccessByEth[intfIdx]; exists {
 		if _, err = strBuilder.WriteString(fmt.Sprintf("Access VLAN: %d\n", vid)); err != nil {
 			return err
 		}
 	}
 
-	if vid, exists := this.vlanNativeByIntf[intfIdx]; exists {
+	if vid, exists := this.vlanNativeByEth[intfIdx]; exists {
 		if _, err = strBuilder.WriteString(fmt.Sprintf("Native VLAN: %d\n", vid)); err != nil {
 			return err
 		}
 	}
 
-	if trunkVlans, exists := this.vlanTrunkByIntf[intfIdx]; exists {
+	if trunkVlans, exists := this.vlanTrunkByEth[intfIdx]; exists {
 		if trunkVlans.Size() > 0 {
 			vlans := trunkVlans.VidTs()
 			if _, err = strBuilder.WriteString("Trunk VLANs:"); err != nil {
@@ -256,7 +399,7 @@ func (this *configLookupTablesT) checkDependenciesForDeletePortBreakout(ifname s
 		}
 	}
 
-	if lagIdx, exists := this.lagByIntf[intfIdx]; exists {
+	if lagIdx, exists := this.lagByEth[intfIdx]; exists {
 		if _, err = strBuilder.WriteString(fmt.Sprintf("LAG: %s\n", this.lagNameByIdx[lagIdx])); err != nil {
 			return err
 		}
@@ -282,8 +425,8 @@ func (table *configLookupTablesT) addNewInterfaceIfItDoesNotExist(ifname string)
 			log.Infof("Saved LAG %s", ifname)
 		}
 	} else if strings.Contains(ifname, "eth") {
-		if _, exists := table.idxByIntfName[ifname]; !exists {
-			table.idxByIntfName[ifname] = table.idxOfLastAddedIntf
+		if _, exists := table.idxByEthName[ifname]; !exists {
+			table.idxByEthName[ifname] = table.idxOfLastAddedIntf
 			table.intfNameByIdx[table.idxOfLastAddedIntf] = ifname
 			table.idxOfLastAddedIntf++
 			log.Infof("Saved interface %s", ifname)
@@ -296,43 +439,132 @@ func (table *configLookupTablesT) addNewInterfaceIfItDoesNotExist(ifname string)
 	return nil
 }
 
-func (table *configLookupTablesT) setNativeVlanOnPort(ifname string, vid lib.VidT) {
+func (table *configLookupTablesT) setVlanModeEthIntf(ifname string, vlanMode oc.E_OpenconfigVlan_VlanModeType) {
 	// TODO: Add asserts for checking if interface exists in map
-	table.vlanNativeByIntf[table.idxByIntfName[ifname]] = vid
-	if _, exists := table.intfByVlanNative[vid]; !exists {
-		table.intfByVlanNative[vid] = lib.NewIdxTSet()
+	table.vlanModeByEth[table.idxByEthName[ifname]] = vlanMode
+}
+
+func (this *configLookupTablesT) deleteAccessVlanEthIntf(ifname string, vidDelete lib.VidT) error {
+	intfIdx, exists := this.idxByEthName[ifname]
+	if !exists {
+		return fmt.Errorf("Ethernet interface %s does not exist", ifname)
 	}
 
-	table.intfByVlanNative[vid].Add(table.idxByIntfName[ifname])
+	vid, exists := this.vlanAccessByEth[intfIdx]
+	if vid != vidDelete {
+		return fmt.Errorf("There is configured other access VLAN %d", vid, ifname)
+	}
+
+	delete(this.vlanAccessByEth, intfIdx)
+	this.ethByVlanAccess[vidDelete].Delete(intfIdx)
+	log.Infof("Deleted access VLAN %d from Ethernet interface %s", vid, ifname)
+	return nil
+}
+
+func (table *configLookupTablesT) setNativeVlanEthIntf(ifname string, vid lib.VidT) {
+	// TODO: Add asserts for checking if interface exists in map
+	table.vlanNativeByEth[table.idxByEthName[ifname]] = vid
+	if _, exists := table.ethByVlanNative[vid]; !exists {
+		table.ethByVlanNative[vid] = lib.NewIdxTSet()
+	}
+
+	table.ethByVlanNative[vid].Add(table.idxByEthName[ifname])
 	log.Infof("Set native VLAN %d on interface %s", vid, ifname)
+}
+
+func (this *configLookupTablesT) deleteNativeVlanEthIntf(ifname string, vidDelete lib.VidT) error {
+	intfIdx, exists := this.idxByEthName[ifname]
+	if !exists {
+		return fmt.Errorf("Ethernet interface %s does not exist", ifname)
+	}
+
+	vid, exists := this.vlanNativeByEth[intfIdx]
+	if vid != vidDelete {
+		return fmt.Errorf("There is configured other native VLAN %d", vid, ifname)
+	}
+
+	delete(this.vlanNativeByEth, intfIdx)
+	this.ethByVlanNative[vidDelete].Delete(intfIdx)
+	log.Infof("Deleted native VLAN %d from Ethernet interface %s", vid, ifname)
+	return nil
+}
+
+func (this *configLookupTablesT) deleteTrunkVlanEthIntf(ifname string, vidDelete lib.VidT) error {
+	intfIdx, exists := this.idxByEthName[ifname]
+	if !exists {
+		return fmt.Errorf("Ethernet interface %s does not exist", ifname)
+	}
+
+	vlans, exists := this.vlanTrunkByEth[intfIdx]
+	if !vlans.Has(vidDelete) {
+		return fmt.Errorf("There is not configured trunk VLAN %d", vidDelete)
+	}
+
+	delete(this.vlanTrunkByEth, intfIdx)
+	this.ethByVlanTrunk[vidDelete].Delete(intfIdx)
+	log.Infof("Deleted trunk VLAN %d from Ethernet interface %s", vidDelete, ifname)
+	return nil
 }
 
 func (table *configLookupTablesT) setAccessVlanOnPort(ifname string, vid lib.VidT) {
 	// TODO: Add asserts for checking if LAG exists in map
-	table.vlanAccessByIntf[table.idxByIntfName[ifname]] = vid
-	if _, exists := table.intfByVlanAccess[vid]; !exists {
-		table.intfByVlanAccess[vid] = lib.NewIdxTSet()
+	table.vlanAccessByEth[table.idxByEthName[ifname]] = vid
+	if _, exists := table.ethByVlanAccess[vid]; !exists {
+		table.ethByVlanAccess[vid] = lib.NewIdxTSet()
 	}
 
-	table.intfByVlanAccess[vid].Add(table.idxByIntfName[ifname])
+	table.ethByVlanAccess[vid].Add(table.idxByEthName[ifname])
 	log.Infof("Set access VLAN %d on port %s", vid, ifname)
 }
 
 func (table *configLookupTablesT) setTrunkVlansOnPort(ifname string, vids []lib.VidT) {
 	// TODO: Add asserts for checking if interface exists in map
 	for _, vid := range vids {
-		if _, exists := table.vlanTrunkByIntf[table.idxByIntfName[ifname]]; !exists {
-			table.vlanTrunkByIntf[table.idxByIntfName[ifname]] = lib.NewVidTSet()
+		if _, exists := table.vlanTrunkByEth[table.idxByEthName[ifname]]; !exists {
+			table.vlanTrunkByEth[table.idxByEthName[ifname]] = lib.NewVidTSet()
 		}
 
-		table.vlanTrunkByIntf[table.idxByIntfName[ifname]].Add(vid)
-		if _, exists := table.intfByVlanTrunk[vid]; !exists {
-			table.intfByVlanTrunk[vid] = lib.NewIdxTSet()
+		table.vlanTrunkByEth[table.idxByEthName[ifname]].Add(vid)
+		if _, exists := table.ethByVlanTrunk[vid]; !exists {
+			table.ethByVlanTrunk[vid] = lib.NewIdxTSet()
 		}
 
-		table.intfByVlanTrunk[vid].Add(table.idxByIntfName[ifname])
+		table.ethByVlanTrunk[vid].Add(table.idxByEthName[ifname])
 		log.Infof("Set trunk VLAN %d on interface %s", vid, ifname)
 	}
+}
+
+func (table *configLookupTablesT) SetVlanModeLagIntf(lagName string, vlanMode oc.E_OpenconfigVlan_VlanModeType) {
+	// TODO: Add asserts for checking if LAG interface exists in map
+	table.vlanModeByLag[table.idxByLagName[lagName]] = vlanMode
+}
+
+func (table *configLookupTablesT) getVlanModeEthIntf(ifname string) (oc.E_OpenconfigVlan_VlanModeType, error) {
+	idxIntf, exists := table.idxByEthName[ifname]
+	if !exists {
+		return oc.OpenconfigVlan_VlanModeType_UNSET, fmt.Errorf("Ethernet interface %s does not exist", ifname)
+	}
+
+	vlanMode, exists := table.vlanModeByEth[idxIntf]
+	if !exists {
+		return oc.OpenconfigVlan_VlanModeType_UNSET, fmt.Errorf("There is not set VLAN mode on Ethernet interface %s", ifname)
+	}
+
+	return vlanMode, nil
+}
+
+func (table *configLookupTablesT) getVlanModeLagIntf(lagName string) (oc.E_OpenconfigVlan_VlanModeType, error) {
+	idxLag, exists := table.idxByLagName[lagName]
+	if !exists {
+		return oc.OpenconfigVlan_VlanModeType_UNSET, fmt.Errorf("LAG interface %s does not exist", lagName)
+	}
+
+	vlanMode, exists := table.vlanModeByLag[idxLag]
+	if !exists {
+		return oc.OpenconfigVlan_VlanModeType_UNSET, fmt.Errorf("There is not set VLAN mode on LAG interface %s", lagName)
+	}
+
+	return vlanMode, nil
 }
 
 func (table *configLookupTablesT) setAccessVlanOnLag(lagName string, vid lib.VidT) {
@@ -375,61 +607,61 @@ func (table *configLookupTablesT) setTrunkVlansOnLag(lagName string, vids []lib.
 }
 
 func (t *configLookupTablesT) addIpv4AddrEthIntf(ifname string, ip string) error {
-	intfIdx := t.idxByIntfName[ifname]
-	if _, exists := t.intfByIpv4Addr[ip]; exists {
+	intfIdx := t.idxByEthName[ifname]
+	if _, exists := t.ethByIpv4Addr[ip]; exists {
 		return fmt.Errorf("Failed to assign IPv4 address %s to interface %s because it is already in use",
 			ip, ifname)
 	}
 
-	t.intfByIpv4Addr[ip] = intfIdx
-	if _, exists := t.ipv4AddrByIntf[t.idxByIntfName[ifname]]; !exists {
-		t.ipv4AddrByIntf[t.idxByIntfName[ifname]] = lib.NewStringSet()
+	t.ethByIpv4Addr[ip] = intfIdx
+	if _, exists := t.ipv4AddrByEth[t.idxByEthName[ifname]]; !exists {
+		t.ipv4AddrByEth[t.idxByEthName[ifname]] = lib.NewStringSet()
 	}
 	// TODO: Check if IP is valid
-	t.ipv4AddrByIntf[t.idxByIntfName[ifname]].Add(ip)
+	t.ipv4AddrByEth[t.idxByEthName[ifname]].Add(ip)
 	log.Infof("Saved IPv4 %s for interface %s", ip, ifname)
 	return nil
 }
 
 func (this *configLookupTablesT) deleteIpv4AddrEthIntf(ifname string, ip string) error {
-	if _, exists := this.intfByIpv4Addr[ip]; !exists {
+	if _, exists := this.ethByIpv4Addr[ip]; !exists {
 		return fmt.Errorf("Failed to delete IPv4 address %s from Ethernet interface %s because interface does not exist",
 			ip, ifname)
 	}
 
-	delete(this.intfByIpv4Addr, ip)
-	intfIdx := this.idxByIntfName[ifname]
-	this.ipv4AddrByIntf[intfIdx].Delete(ip)
+	delete(this.ethByIpv4Addr, ip)
+	intfIdx := this.idxByEthName[ifname]
+	this.ipv4AddrByEth[intfIdx].Delete(ip)
 	log.Infof("Deleted IPv4 %s from Ethernet interface %s", ip, ifname)
 	return nil
 }
 
 func (t *configLookupTablesT) saveIpv6AddrAddressForInterface(ifname string, ip string) error {
-	intfIdx := t.idxByIntfName[ifname]
-	if _, exists := t.intfByIpv6Addr[ip]; exists {
+	intfIdx := t.idxByEthName[ifname]
+	if _, exists := t.ethByIpv6Addr[ip]; exists {
 		return fmt.Errorf("Failed to assign IPv6 address %s to interface %s because it is already in use",
 			ip, ifname)
 	}
 
-	t.intfByIpv6Addr[ip] = intfIdx
-	if _, exists := t.ipv6AddrByIntf[intfIdx]; !exists {
-		t.ipv6AddrByIntf[intfIdx] = lib.NewStringSet()
+	t.ethByIpv6Addr[ip] = intfIdx
+	if _, exists := t.ipv6AddrByEth[intfIdx]; !exists {
+		t.ipv6AddrByEth[intfIdx] = lib.NewStringSet()
 	}
 	// TODO: Check if IP is valid
-	t.ipv6AddrByIntf[intfIdx].Add(ip)
+	t.ipv6AddrByEth[intfIdx].Add(ip)
 	log.Infof("Saved IPv6 %s for interface %s", ip, ifname)
 	return nil
 }
 
 func (this *configLookupTablesT) deleteIpv6AddrEthIntf(ifname string, ip string) error {
-	if _, exists := this.intfByIpv6Addr[ip]; !exists {
+	if _, exists := this.ethByIpv6Addr[ip]; !exists {
 		return fmt.Errorf("Failed to delete IPv6 address %s from Ethernet interface %s because interface does not exist",
 			ip, ifname)
 	}
 
-	delete(this.intfByIpv6Addr, ip)
-	intfIdx := this.idxByIntfName[ifname]
-	this.ipv6AddrByIntf[intfIdx].Delete(ip)
+	delete(this.ethByIpv6Addr, ip)
+	intfIdx := this.idxByEthName[ifname]
+	this.ipv6AddrByEth[intfIdx].Delete(ip)
 	log.Infof("Deleted IPv6 %s from Ethernet interface %s", ip, ifname)
 	return nil
 }
@@ -478,18 +710,18 @@ func (t *configLookupTablesT) parseInterfaceAsLagMember(ifname string, eth *oc.I
 		return fmt.Errorf("Invalid LAG %s on interface %s: LAG not exists", lagName, ifname)
 	}
 
-	intfIdx := t.idxByIntfName[ifname]
-	if lag, exists := t.lagByIntf[intfIdx]; exists {
+	intfIdx := t.idxByEthName[ifname]
+	if lag, exists := t.lagByEth[intfIdx]; exists {
 		if lag == lagIdx {
 			return fmt.Errorf("Interface %s exists in another LAG %s", ifname, t.lagNameByIdx[lag])
 		}
 	}
-	t.lagByIntf[intfIdx] = lagIdx
+	t.lagByEth[intfIdx] = lagIdx
 
-	if _, exists = t.intfByLag[lagIdx]; !exists {
-		t.intfByLag[lagIdx] = lib.NewIdxTSet()
+	if _, exists = t.ethByLag[lagIdx]; !exists {
+		t.ethByLag[lagIdx] = lib.NewIdxTSet()
 	}
-	t.intfByLag[lagIdx].Add(intfIdx)
+	t.ethByLag[lagIdx].Add(intfIdx)
 
 	log.Infof("Added interface %s as member of LAG %s", ifname, lagName)
 	return nil
@@ -532,7 +764,7 @@ func (t *configLookupTablesT) parseVlanForIntf(ifname string, swVlan *oc.Interfa
 	} else if intfMode == oc.OpenconfigVlan_VlanModeType_TRUNK {
 		nativeVid := lib.VidT(swVlan.GetNativeVlan())
 		if nativeVid != 0 {
-			t.setNativeVlanOnPort(ifname, nativeVid)
+			t.setNativeVlanEthIntf(ifname, nativeVid)
 			log.Infof("Set native VLAN %d for interface %s", nativeVid, ifname)
 		}
 
@@ -568,7 +800,11 @@ func (t *configLookupTablesT) parseVlanForIntf(ifname string, swVlan *oc.Interfa
 		if nativeVid == 0 && trunkVlans == nil {
 			return fmt.Errorf("Failed to parse VLANs on interface %s in trunk mode", ifname)
 		}
+	} else {
+		intfMode = oc.OpenconfigVlan_VlanModeType_UNSET
 	}
+
+	t.setVlanModeEthIntf(ifname, intfMode)
 
 	return nil
 }
@@ -622,7 +858,11 @@ func (t *configLookupTablesT) parseVlanForLagIntf(lagName string, swVlan *oc.Int
 		if nativeVid == 0 && trunkVlans == nil {
 			return fmt.Errorf("Failed to parse VLANs on interface %s in trunk mode", lagName)
 		}
+	} else {
+		intfMode = oc.OpenconfigVlan_VlanModeType_UNSET
 	}
+
+	t.SetVlanModeLagIntf(lagName, intfMode)
 
 	return nil
 }
@@ -631,9 +871,9 @@ func (this *configLookupTablesT) makeCopy() *configLookupTablesT {
 	copy := newConfigLookupTables()
 
 	copy.idxOfLastAddedIntf = this.idxOfLastAddedIntf
-	copy.idxByIntfName = make(map[string]lib.IdxT, maxPortsC)
-	for k, v := range this.idxByIntfName {
-		copy.idxByIntfName[k] = v
+	copy.idxByEthName = make(map[string]lib.IdxT, maxPortsC)
+	for k, v := range this.idxByEthName {
+		copy.idxByEthName[k] = v
 	}
 	copy.intfNameByIdx = make(map[lib.IdxT]string, maxPortsC)
 	for k, v := range this.intfNameByIdx {
@@ -660,9 +900,9 @@ func (this *configLookupTablesT) makeCopy() *configLookupTablesT {
 		copy.vlanNameByIdx[k] = v
 	}
 
-	copy.ipv4AddrByIntf = make(map[lib.IdxT]*lib.StringSet, len(this.ipv4AddrByIntf))
-	for k, v := range this.ipv4AddrByIntf {
-		copy.ipv4AddrByIntf[k] = v.MakeCopy()
+	copy.ipv4AddrByEth = make(map[lib.IdxT]*lib.StringSet, len(this.ipv4AddrByEth))
+	for k, v := range this.ipv4AddrByEth {
+		copy.ipv4AddrByEth[k] = v.MakeCopy()
 	}
 	copy.ipv4AddrByLag = make(map[lib.IdxT]*lib.StringSet, len(this.ipv4AddrByLag))
 	for k, v := range this.ipv4AddrByLag {
@@ -672,9 +912,9 @@ func (this *configLookupTablesT) makeCopy() *configLookupTablesT {
 	for k, v := range this.ipv4AddrByVlan {
 		copy.ipv4AddrByVlan[k] = v.MakeCopy()
 	}
-	copy.intfByIpv4Addr = make(map[string]lib.IdxT, len(this.intfByIpv4Addr))
-	for k, v := range this.intfByIpv4Addr {
-		copy.intfByIpv4Addr[k] = v
+	copy.ethByIpv4Addr = make(map[string]lib.IdxT, len(this.ethByIpv4Addr))
+	for k, v := range this.ethByIpv4Addr {
+		copy.ethByIpv4Addr[k] = v
 	}
 	copy.lagByIpv4Addr = make(map[string]lib.IdxT, len(this.lagByIpv4Addr))
 	for k, v := range this.lagByIpv4Addr {
@@ -685,9 +925,9 @@ func (this *configLookupTablesT) makeCopy() *configLookupTablesT {
 		copy.vlanByIpv4Addr[k] = v
 	}
 
-	copy.ipv6AddrByIntf = make(map[lib.IdxT]*lib.StringSet, len(this.ipv6AddrByIntf))
-	for k, v := range this.ipv6AddrByIntf {
-		copy.ipv6AddrByIntf[k] = v.MakeCopy()
+	copy.ipv6AddrByEth = make(map[lib.IdxT]*lib.StringSet, len(this.ipv6AddrByEth))
+	for k, v := range this.ipv6AddrByEth {
+		copy.ipv6AddrByEth[k] = v.MakeCopy()
 	}
 	copy.ipv6AddrByLag = make(map[lib.IdxT]*lib.StringSet, len(this.ipv6AddrByLag))
 	for k, v := range this.ipv6AddrByLag {
@@ -697,9 +937,9 @@ func (this *configLookupTablesT) makeCopy() *configLookupTablesT {
 	for k, v := range this.ipv6AddrByVlan {
 		copy.ipv6AddrByVlan[k] = v.MakeCopy()
 	}
-	copy.intfByIpv6Addr = make(map[string]lib.IdxT, len(this.intfByIpv6Addr))
-	for k, v := range this.intfByIpv6Addr {
-		copy.intfByIpv6Addr[k] = v
+	copy.ethByIpv6Addr = make(map[string]lib.IdxT, len(this.ethByIpv6Addr))
+	for k, v := range this.ethByIpv6Addr {
+		copy.ethByIpv6Addr[k] = v
 	}
 	copy.lagByIpv6Addr = make(map[string]lib.IdxT, len(this.lagByIpv6Addr))
 	for k, v := range this.lagByIpv6Addr {
@@ -710,62 +950,71 @@ func (this *configLookupTablesT) makeCopy() *configLookupTablesT {
 		copy.vlanByIpv6Addr[k] = v
 	}
 
-	copy.lagByIntf = make(map[lib.IdxT]lib.IdxT, len(this.lagByIntf))
-	for k, v := range this.lagByIntf {
-		copy.lagByIntf[k] = v
+	copy.lagByEth = make(map[lib.IdxT]lib.IdxT, len(this.lagByEth))
+	for k, v := range this.lagByEth {
+		copy.lagByEth[k] = v
 	}
-	copy.intfByLag = make(map[lib.IdxT]*lib.IdxTSet, len(this.intfByLag))
-	for k, v := range this.intfByLag {
-		copy.intfByLag[k] = v.MakeCopy()
+	copy.ethByLag = make(map[lib.IdxT]*lib.IdxTSet, len(this.ethByLag))
+	for k, v := range this.ethByLag {
+		copy.ethByLag[k] = v.MakeCopy()
 	}
 
-	copy.stpByIntf = this.stpByIntf.MakeCopy()
+	copy.stpByEth = this.stpByEth.MakeCopy()
 
-	copy.vlanAccessByIntf = make(map[lib.IdxT]lib.VidT, len(this.vlanAccessByIntf))
-	for k, v := range this.vlanAccessByIntf {
-		copy.vlanAccessByIntf[k] = v
+	copy.vlanModeByEth = make(map[lib.IdxT]oc.E_OpenconfigVlan_VlanModeType, len(this.vlanModeByEth))
+	for k, v := range this.vlanModeByEth {
+		copy.vlanModeByEth[k] = v
+	}
+	copy.vlanModeByLag = make(map[lib.IdxT]oc.E_OpenconfigVlan_VlanModeType, len(this.vlanModeByEth))
+	for k, v := range this.vlanModeByLag {
+		copy.vlanModeByLag[k] = v
+	}
+
+	copy.vlanAccessByEth = make(map[lib.IdxT]lib.VidT, len(this.vlanAccessByEth))
+	for k, v := range this.vlanAccessByEth {
+		copy.vlanAccessByEth[k] = v
 	}
 	copy.vlanAccessByLag = make(map[lib.IdxT]lib.VidT, len(this.vlanAccessByLag))
 	for k, v := range this.vlanAccessByLag {
 		copy.vlanAccessByLag[k] = v
 	}
-	copy.intfByVlanAccess = make(map[lib.VidT]*lib.IdxTSet, len(this.intfByVlanAccess))
-	for k, v := range this.intfByVlanAccess {
-		copy.intfByVlanAccess[k] = v.MakeCopy()
+	copy.ethByVlanAccess = make(map[lib.VidT]*lib.IdxTSet, len(this.ethByVlanAccess))
+	for k, v := range this.ethByVlanAccess {
+		copy.ethByVlanAccess[k] = v.MakeCopy()
 	}
 	copy.lagByVlanAccess = make(map[lib.VidT]*lib.IdxTSet, len(this.lagByVlanAccess))
 	for k, v := range this.lagByVlanAccess {
 		copy.lagByVlanAccess[k] = v.MakeCopy()
 	}
 
-	copy.vlanNativeByIntf = make(map[lib.IdxT]lib.VidT, len(this.vlanNativeByIntf))
-	for k, v := range this.vlanNativeByIntf {
-		copy.vlanNativeByIntf[k] = v
+	copy.vlanNativeByEth = make(map[lib.IdxT]lib.VidT, len(this.vlanNativeByEth))
+	for k, v := range this.vlanNativeByEth {
+		copy.vlanNativeByEth[k] = v
 	}
 	copy.vlanNativeByLag = make(map[lib.IdxT]lib.VidT, len(this.vlanNativeByLag))
 	for k, v := range this.vlanNativeByLag {
 		copy.vlanNativeByLag[k] = v
 	}
-	copy.intfByVlanNative = make(map[lib.VidT]*lib.IdxTSet, len(this.intfByVlanNative))
-	for k, v := range this.intfByVlanNative {
-		copy.intfByVlanNative[k] = v.MakeCopy()
+	copy.ethByVlanNative = make(map[lib.VidT]*lib.IdxTSet, len(this.ethByVlanNative))
+	for k, v := range this.ethByVlanNative {
+		copy.ethByVlanNative[k] = v.MakeCopy()
 	}
 	copy.lagByVlanNative = make(map[lib.VidT]*lib.IdxTSet, len(this.lagByVlanNative))
 	for k, v := range this.lagByVlanNative {
 		copy.lagByVlanNative[k] = v.MakeCopy()
 	}
 
-	copy.vlanTrunkByIntf = make(map[lib.IdxT]*lib.VidTSet, len(this.vlanTrunkByIntf))
-	for k, v := range this.vlanTrunkByIntf {
-		copy.vlanTrunkByIntf[k] = v.MakeCopy()
+	copy.vlanTrunkByEth = make(map[lib.IdxT]*lib.VidTSet, len(this.vlanTrunkByEth))
+	for k, v := range this.vlanTrunkByEth {
+		copy.vlanTrunkByEth[k] = v.MakeCopy()
 	}
 	copy.vlanTrunkByLag = make(map[lib.IdxT]*lib.VidTSet, len(this.vlanTrunkByLag))
 	for k, v := range this.vlanTrunkByLag {
 		copy.vlanTrunkByLag[k] = v.MakeCopy()
 	}
-	copy.intfByVlanTrunk = make(map[lib.VidT]*lib.IdxTSet, len(this.intfByVlanTrunk))
-	for k, v := range this.intfByVlanTrunk {
-		copy.intfByVlanTrunk[k] = v.MakeCopy()
+	copy.ethByVlanTrunk = make(map[lib.VidT]*lib.IdxTSet, len(this.ethByVlanTrunk))
+	for k, v := range this.ethByVlanTrunk {
+		copy.ethByVlanTrunk[k] = v.MakeCopy()
 	}
 	copy.lagByVlanTrunk = make(map[lib.VidT]*lib.IdxTSet, len(this.lagByVlanTrunk))
 	for k, v := range this.lagByVlanTrunk {
@@ -779,7 +1028,7 @@ func (t *configLookupTablesT) dump() {
 	log.Infoln("Dump internal state of config lookup tables")
 	log.Infoln("========================================")
 	intfs := make([]string, 0)
-	for ifname, _ := range t.idxByIntfName {
+	for ifname, _ := range t.idxByEthName {
 		intfs = append(intfs, ifname)
 	}
 	sort.Strings(intfs)
@@ -802,9 +1051,20 @@ func (t *configLookupTablesT) dump() {
 	}
 
 	log.Infoln("========================================")
+	log.Infoln("Print VLAN mode of Ethernet interface:")
+	for _, ifname := range intfs {
+		if vlanMode, exists := t.vlanModeByEth[t.idxByEthName[ifname]]; exists {
+			log.Infof("VLAN mode on interface %s: %d", ifname, vlanMode)
+		} else {
+			log.Infof("There isn't set VLAN mode on interface %s", ifname)
+			log.Infoln("----------------------------------------")
+			continue
+		}
+	}
+
 	log.Infoln("Print membership of interfaces in access VLAN:")
 	for _, ifname := range intfs {
-		if accessVid, exists := t.vlanAccessByIntf[t.idxByIntfName[ifname]]; exists {
+		if accessVid, exists := t.vlanAccessByEth[t.idxByEthName[ifname]]; exists {
 			log.Infof("Access VLAN on interface %s: %d", ifname, accessVid)
 		} else {
 			log.Infof("There isn't access VLAN on interface %s", ifname)
@@ -816,8 +1076,8 @@ func (t *configLookupTablesT) dump() {
 	log.Infoln("========================================")
 	log.Infoln("Print membership of interfaces in trunk VLANs:")
 	for _, ifname := range intfs {
-		idx := t.idxByIntfName[ifname]
-		vids, exists := t.vlanTrunkByIntf[idx]
+		idx := t.idxByEthName[ifname]
+		vids, exists := t.vlanTrunkByEth[idx]
 		if !exists {
 			log.Infof("There aren't any trunk VLANs on interface %s", ifname)
 			log.Infoln("----------------------------------------")
@@ -829,13 +1089,25 @@ func (t *configLookupTablesT) dump() {
 			vlans = append(vlans, int(vid))
 		}
 		sort.Ints(vlans)
-		log.Infof("There are %d VLANs on interface %s:", len(vlans), ifname)
+		log.Infof("There are %d trunk VLANs on interface %s:", len(vlans), ifname)
 		for _, vid := range vlans {
 			log.Infoln(vid)
 		}
 
-		if nativeVid, exists := t.vlanNativeByIntf[idx]; exists {
+		if nativeVid, exists := t.vlanNativeByEth[idx]; exists {
 			log.Infof("Native VLAN on interface %s: %d", ifname, nativeVid)
+		}
+	}
+
+	log.Infoln("========================================")
+	log.Infoln("Print VLAN mode of LAG interface:")
+	for _, lagName := range lags {
+		if vlanMode, exists := t.vlanModeByLag[t.idxByLagName[lagName]]; exists {
+			log.Infof("VLAN mode on LAG interface %s: %d", lagName, vlanMode)
+		} else {
+			log.Infof("There isn't set VLAN mode on LAG interface %s", lagName)
+			log.Infoln("----------------------------------------")
+			continue
 		}
 	}
 
@@ -880,8 +1152,8 @@ func (t *configLookupTablesT) dump() {
 	log.Infoln("========================================")
 	log.Infoln("Print IPv4 addresses on interfaces:")
 	for _, ifname := range intfs {
-		idx := t.idxByIntfName[ifname]
-		ipAddrs, exists := t.ipv4AddrByIntf[idx]
+		idx := t.idxByEthName[ifname]
+		ipAddrs, exists := t.ipv4AddrByEth[idx]
 		if !exists {
 			log.Infof("There aren't any IPv4 addresses on interface %s", ifname)
 			log.Infoln("----------------------------------------")
@@ -902,8 +1174,8 @@ func (t *configLookupTablesT) dump() {
 	log.Infoln("========================================")
 	log.Infoln("Print IPv6 addresses on interfaces:")
 	for _, ifname := range intfs {
-		idx := t.idxByIntfName[ifname]
-		ipAddrs, exists := t.ipv6AddrByIntf[idx]
+		idx := t.idxByEthName[ifname]
+		ipAddrs, exists := t.ipv6AddrByEth[idx]
 		if !exists {
 			log.Infof("There aren't any IPv6 addresses on interface %s", ifname)
 			log.Infoln("----------------------------------------")

@@ -181,36 +181,6 @@ func (this *ConfigMngrT) IsChangedIpv4AddrEthSubintfPrfxLen(change *diff.Change)
 	return true
 }
 
-func (this *ConfigMngrT) appendSetIpv4AddrEthIntfCmdToTransaction(ifname string, cmdSet *cmd.SetIpv4AddrEthIntfCmdT) error {
-	setIpv4AddrForEthIntfCmds := this.cmdByIfname[setIpv4AddrForEthIntfC]
-	for _, setIpv4AddrForEthIntfCmd := range setIpv4AddrForEthIntfCmds {
-		if setIpv4AddrForEthIntfCmd.Equals(cmdSet) {
-			return fmt.Errorf("Command %q already exists in transaction", cmdSet.GetName())
-		}
-	}
-
-	log.Infof("Append command %q to transaction", cmdSet.GetName())
-
-	setIpv4AddrForEthIntfCmds[ifname] = cmdSet
-	this.addCmdToListTrans(cmdSet)
-	return nil
-}
-
-func (this *ConfigMngrT) appendDeleteIpv4AddrEthIntfCmdToTransaction(ifname string, cmdDelete *cmd.DeleteIpv4AddrEthIntfCmdT) error {
-	deleteIpv4AddrFromEthIntfCmds := this.cmdByIfname[deleteIpv4AddrFromEthIntfC]
-	for _, deleteIpv4AddrFromEthIntfCmd := range deleteIpv4AddrFromEthIntfCmds {
-		if deleteIpv4AddrFromEthIntfCmd.Equals(cmdDelete) {
-			return fmt.Errorf("Command %q already exists in transaction", cmdDelete.GetName())
-		}
-	}
-
-	log.Infof("Append command %q to transaction", cmdDelete.GetName())
-
-	deleteIpv4AddrFromEthIntfCmds[ifname] = cmdDelete
-	this.addCmdToListTrans(cmdDelete)
-	return nil
-}
-
 func (this *ConfigMngrT) validateSetIpv4AddrEthIntf(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
 	ifname := changeItem.Change.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC]
 	if !this.isEthIntfAvailable(ifname) {
@@ -254,7 +224,7 @@ func (this *ConfigMngrT) validateSetIpv4AddrEthIntf(changeItem *DiffChangeMgmtT,
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendSetIpv4AddrEthIntfCmdToTransaction(ifname, setIpv4AddrEthIntfCmd); err != nil {
+		if err = this.appendCmdToTransactionByIfname(ifname, setIpv4AddrEthIntfCmd, setIpv4AddrForEthIntfC); err != nil {
 			return err
 		}
 
@@ -307,7 +277,7 @@ func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgm
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendDeleteIpv4AddrEthIntfCmdToTransaction(ifname, deleteIpv4AddrEthIntfCmd); err != nil {
+		if err = this.appendCmdToTransactionByIfname(ifname, deleteIpv4AddrEthIntfCmd, deleteIpv4AddrFromEthIntfC); err != nil {
 			return err
 		}
 

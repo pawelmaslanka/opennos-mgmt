@@ -472,6 +472,10 @@ func inspectUnderlyingTypeValue(val reflect.Value) (*pb.TypedValue, error) {
 		}
 
 		switch valueField.Kind() {
+		case reflect.Bool:
+			return &pb.TypedValue{Value: &pb.TypedValue_BoolVal{BoolVal: valueField.Interface().(bool)}}, nil
+		case reflect.Float32:
+			return &pb.TypedValue{Value: &pb.TypedValue_FloatVal{FloatVal: valueField.Interface().(float32)}}, nil
 		case reflect.Int8:
 			return &pb.TypedValue{Value: &pb.TypedValue_IntVal{IntVal: int64(valueField.Interface().(int8))}}, nil
 		case reflect.Int16:
