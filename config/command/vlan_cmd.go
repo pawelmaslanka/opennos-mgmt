@@ -11,9 +11,11 @@ const (
 	VlanEthIfnamePathItemIdxC           = 1
 	VlanEthEthernetPathItemIdxC         = 2
 	VlanEthSwVlanPathItemIdxC           = 3
+	VlanEthVlanModePathItemIdxC         = 4
 	VlanEthAccessVlanPathItemIdxC       = 4
 	VlanEthNativeVlanPathItemIdxC       = 4
 	VlanEthTrunkVlanPathItemIdxC        = 4
+	VlanModeEthPathItemsCountC          = 5
 	AccessVlanEthPathItemsCountC        = 5
 	NativeVlanEthPathItemsCountC        = 5
 	TrunkVlanEthPathItemsCountC         = 6
@@ -22,6 +24,7 @@ const (
 	VlanEthIntfPathItemC               = "Interface"
 	VlanEthEthernetPathItemC           = "Ethernet"
 	VlanEthSwVlanPathItemC             = "SwitchedVlan"
+	VlanEthVlanModePathItemC           = "InterfaceMode"
 	VlanEthAccessVlanPathItemC         = "AccessVlan"
 	VlanEthNativeVlanPathItemC         = "NativeVlan"
 	VlanEthTrunkVlanPathItemC          = "TrunkVlans"
@@ -34,6 +37,75 @@ const (
 	maxChangeVlanIdxC
 )
 
+// SetVlanModeEthIntfCmdT implements command for set VLAN mode for Ethernet Interface
+type SetVlanModeEthIntfCmdT struct {
+	*commandT // commandT is embedded as a pointer because its state will be modify
+}
+
+// NewSetNativeVlanEthIntfCmdT creates new instance of SetVlanModeEthIntfCmdT type
+func NewSetVlanModeEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetVlanModeEthIntfCmdT {
+	changes := make([]*diff.Change, maxChangeVlanIdxC)
+	changes[vlanChangeIdxC] = vlan
+	return &SetVlanModeEthIntfCmdT{
+		commandT: newCommandT("set vlan mode for ethernet interface", changes, ethSwitchMgmt),
+	}
+}
+
+// Execute implements the same method from CommandI interface and set VLAN mode for Ethernet interface
+func (this *SetVlanModeEthIntfCmdT) Execute() error {
+	shouldBeAbleOnlyToUndo := false
+	return this.doSetVlanModeCmd(shouldBeAbleOnlyToUndo)
+}
+
+// Undo implements the same method from CommandI interface and withdraws changes performed by
+// previously execution of Execute() method
+func (this *SetVlanModeEthIntfCmdT) Undo() error {
+	shouldBeAbleOnlyToUndo := true
+	return this.doSetVlanModeCmd(shouldBeAbleOnlyToUndo)
+}
+
+// GetName implements the same method from CommandI interface and returns name of command
+func (this *SetVlanModeEthIntfCmdT) GetName() string {
+	return this.name
+}
+
+// Equals checks if 'this' command and 'other' command are the same... do the same thing
+func (this *SetVlanModeEthIntfCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*SetVlanModeEthIntfCmdT)
+	return this.equals(otherCmd.commandT)
+}
+
+func (this *commandT) doSetVlanModeCmd(shouldBeAbleOnlyToUndo bool) error {
+	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return this.createErrorAccordingToExecutionState()
+	}
+
+	this.dumpInternalData()
+	// numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
+	// if err != nil {
+	// 	return err
+	// }
+
+	// channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
+	// if err != nil {
+	// 	return err
+	// }
+
+	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	// defer cancel()
+	// _, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
+	// 	Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
+	// 	NumChannels:  numChannels,
+	// 	ChannelSpeed: &channelSpeed,
+	// })
+	// if err != nil {
+	// 	return err
+	// }
+
+	this.finalize()
+	return nil
+}
+
 // SetAccessVlanEthIntfCmdT implements command for set access VLAN for Ethernet Interface
 type SetAccessVlanEthIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
@@ -44,11 +116,11 @@ func NewSetAccessVlanEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitc
 	changes := make([]*diff.Change, maxChangeVlanIdxC)
 	changes[vlanChangeIdxC] = vlan
 	return &SetAccessVlanEthIntfCmdT{
-		commandT: newCommandT("set access vlan from ethernet interface", changes, ethSwitchMgmt),
+		commandT: newCommandT("set access vlan for ethernet interface", changes, ethSwitchMgmt),
 	}
 }
 
-// Execute implements the same method from CommandI interface and set access VLAN from Ethernet interface
+// Execute implements the same method from CommandI interface and set access VLAN for Ethernet interface
 func (this *SetAccessVlanEthIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
 	return this.doSetAccessVlanCmd(shouldBeAbleOnlyToUndo)

@@ -209,6 +209,27 @@ func (this *configLookupTablesT) checkDependenciesForDeleteIpv4AddrFromEthIntf(i
 	return errors.New(strBuilder.String())
 }
 
+func (this *configLookupTablesT) checkDependenciesForSetVlanModeForEthIntf(ifname string, setVlanMode oc.E_OpenconfigVlan_VlanModeType) error {
+	var err error
+	strBuilder := strings.Builder{}
+	intfIdx := this.idxByEthName[ifname]
+
+	if vlanMode, exists := this.vlanModeByEth[intfIdx]; exists {
+		if vlanMode == setVlanMode {
+			msg := fmt.Sprintf("VLAN mode (%d) is already configured on Ethernet interface %s", setVlanMode, ifname)
+			if _, err = strBuilder.WriteString(msg); err != nil {
+				return err
+			}
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
 func (this *configLookupTablesT) checkDependenciesForSetAccessVlanForEthIntf(ifname string, setVid lib.VidT) error {
 	var err error
 	strBuilder := strings.Builder{}
@@ -486,9 +507,14 @@ func (table *configLookupTablesT) addNewInterfaceIfItDoesNotExist(ifname string)
 	return nil
 }
 
-func (table *configLookupTablesT) setVlanModeEthIntf(ifname string, vlanMode oc.E_OpenconfigVlan_VlanModeType) {
-	// TODO: Add asserts for checking if interface exists in map
-	table.vlanModeByEth[table.idxByEthName[ifname]] = vlanMode
+func (table *configLookupTablesT) setVlanModeEthIntf(ifname string, vlanMode oc.E_OpenconfigVlan_VlanModeType) error {
+	intfIdx, exists := table.idxByEthName[ifname]
+	if !exists {
+		return fmt.Errorf("Ethernet interface %s does not exist", ifname)
+	}
+	table.vlanModeByEth[intfIdx] = vlanMode
+
+	return nil
 }
 
 func (this *configLookupTablesT) deleteAccessVlanEthIntf(ifname string, vidDelete lib.VidT) error {

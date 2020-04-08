@@ -48,8 +48,8 @@ const (
 	setIpv4AddrForLagIntfC                          // Assign IPv4/CIDRv4 address to LAG interface
 	setIpv6AddrForEthIntfC                          // Assign IPv6/CIDRv6 address to Ethernet interface
 	setIpv6AddrForLagIntfC                          // Assign IPv6/CIDRv6 address to LAG interface
-	setVlanIntfModeForEthIntfC                      // Set VLAN interface mode for Ethernet interface
-	setVlanIntfModeForLagIntfC                      // Set VLAN interface mode for LAG interface
+	setVlanModeForEthIntfC                          // Set VLAN interface mode for Ethernet interface
+	setVlanModeForLagIntfC                          // Set VLAN interface mode for LAG interface
 	setAccessVlanForEthIntfC                        // Assign Ethernet interface to access VLAN
 	setAccessVlanForLagIntfC                        // Assign LAG interface to access VLAN
 	setNativeVlanForEthIntfC                        // Assign Ethernet interface to native VLAN
@@ -447,6 +447,13 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 			break
 		}
 		if cnt, err = this.processSetIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		if cnt, err = this.processSetVlanModeEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
 		countChanges -= cnt
