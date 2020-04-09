@@ -72,3 +72,53 @@ func (this *commandT) doSetLagIntfMemberCmd(shouldBeAbleOnlyToUndo bool) error {
 	this.finalize()
 	return nil
 }
+
+// DeleteLagIntfMemberCmdT implements command for remove Ethernet interface from LAG
+type DeleteLagIntfMemberCmdT struct {
+	*commandT // commandT is embedded as a pointer because its state will be modify
+}
+
+// NewDeleteLagIntfMemberCmdT creates new instance of DeleteLagIntfMemberCmdT type
+func NewDeleteLagIntfMemberCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *DeleteLagIntfMemberCmdT {
+	changes := make([]*diff.Change, maxLagMemberChangeIdxC)
+	changes[lagMemberChangeIdxC] = vlan
+	return &DeleteLagIntfMemberCmdT{
+		commandT: newCommandT("delete lag interface member", changes, ethSwitchMgmt),
+	}
+}
+
+// Execute implements the same method from CommandI interface and removes Ethernet interface from LAG
+func (this *DeleteLagIntfMemberCmdT) Execute() error {
+	shouldBeAbleOnlyToUndo := false
+	return this.doDeleteLagIntfMemberCmd(shouldBeAbleOnlyToUndo)
+}
+
+// Undo implements the same method from CommandI interface and withdraws changes performed by
+// previously execution of Execute() method
+func (this *DeleteLagIntfMemberCmdT) Undo() error {
+	shouldBeAbleOnlyToUndo := true
+	return this.doDeleteLagIntfMemberCmd(shouldBeAbleOnlyToUndo)
+}
+
+// GetName implements the same method from CommandI interface and returns name of command
+func (this *DeleteLagIntfMemberCmdT) GetName() string {
+	return this.name
+}
+
+// Equals checks if 'this' command and 'other' command are the same... do the same thing
+func (this *DeleteLagIntfMemberCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*DeleteLagIntfMemberCmdT)
+	return this.equals(otherCmd.commandT)
+}
+
+func (this *commandT) doDeleteLagIntfMemberCmd(shouldBeAbleOnlyToUndo bool) error {
+	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return this.createErrorAccordingToExecutionState()
+	}
+
+	this.dumpInternalData()
+	// TODO: Make implementations
+
+	this.finalize()
+	return nil
+}

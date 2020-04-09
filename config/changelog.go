@@ -37,3 +37,14 @@ func NewDiffChangelogMgmtT(changelog *diff.Changelog) *DiffChangelogMgmtT {
 
 	return &diffChangelog
 }
+
+func (this *DiffChangelogMgmtT) isProcessed() bool {
+	var cnt countT = 0
+	for _, change := range this.Changes {
+		if change.IsProcessed() {
+			cnt++
+		}
+	}
+
+	return countT(len(this.Changes)) == cnt
+}

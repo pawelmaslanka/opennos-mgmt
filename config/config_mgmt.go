@@ -35,6 +35,7 @@ const (
 	deleteLagIntfFromNativeVlanC                    // Remove LAG interface from native VLAN
 	deleteEthIntfFromTrunkVlanC                     // Remove Ethernet interface from trunk VLAN
 	deleteEthIntfFromLagIntfC                       // Remove Ethernet interface from LAG membership
+	deleteLagIntfMemberC                            // Remove Ethernet interface from LAG
 	deleteLagIntfC                                  // Delete LAG interface
 	deletePortBreakoutC                             // Combine multiple logical ports into single port
 	setPortBreakoutC                                // Break out front panel port into multiple logical ports
@@ -399,95 +400,48 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 		this.transConfigLookupTbl = this.configLookupTbl.makeCopy()
 	}
 
-	countChanges := len(*changelog)
-	var cnt int
 	diffChangelog := NewDiffChangelogMgmtT(changelog)
 	for {
 		// Deletion section
-		if cnt, err = this.processDeleteIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
+		if err = this.processDeleteIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processDeleteAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
+		if err = this.processDeleteAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processDeleteNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
+		if err = this.processDeleteNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processDeleteTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
+		if err = this.processDeleteTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
+		if err = this.processDeleteLagIntfMemberFromChangelog(diffChangelog); err != nil {
+			return err
 		}
 		// Set section
-		if cnt, err = this.processSetPortBreakoutFromChangelog(diffChangelog); err != nil {
+		if err = this.processSetPortBreakoutFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processSetPortBreakoutChanSpeedFromChangelog(diffChangelog); err != nil {
+		if err = this.processSetPortBreakoutChanSpeedFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processSetLagIntfMemberFromChangelog(diffChangelog); err != nil {
+		if err = this.processSetLagIntfMemberFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processSetIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
+		if err = this.processSetIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processSetVlanModeEthIntfFromChangelog(diffChangelog); err != nil {
+		if err = this.processSetVlanModeEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processSetAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
+		if err = this.processSetAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processSetNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
+		if err = this.processSetNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
-		}
-		if cnt, err = this.processSetTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
+		if err = this.processSetTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
-		}
-		countChanges -= cnt
-		if countChanges <= 0 {
-			break
 		}
 		// if len(changedItem.Change.Path) > 4 {
 		// 	if "NativeVlan" == changedItem.Change.Path[4] {

@@ -106,13 +106,14 @@ var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cb
 		return err
 	}
 
-	log.Infof("Changlog (%d):\n%#v\n", len(changelog), changelog)
+	log.Infof("Number of changes: %d", len(changelog))
 	jsonDump, err := json.MarshalIndent(changelog, "", "    ")
 	if err != nil {
 		log.Errorf("Failed to JSON dump: %s", err)
+	} else {
+		log.Infof("Dump JSON: %s", string(jsonDump))
 	}
 
-	log.Infof("Dump JSON: %s", string(jsonDump))
 	if len(changelog) == 0 {
 		return nil
 	}

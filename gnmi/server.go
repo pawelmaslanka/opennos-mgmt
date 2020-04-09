@@ -163,7 +163,6 @@ func (s *Server) doDelete(jsonTree map[string]interface{}, prefix, path *pb.Path
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-
 		return newConfig, nil
 	}
 
@@ -663,7 +662,7 @@ func (s *Server) Set(ctx context.Context, req *pb.SetRequest) (*pb.SetResponse, 
 		}
 
 		// Means that there wasn't any delete request
-		if updatedConfig != nil {
+		if newConfig != nil {
 			if i+1 == updatesSize {
 				updatedConfig = newConfig
 			}

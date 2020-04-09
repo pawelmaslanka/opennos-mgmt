@@ -111,25 +111,63 @@ func newConfigLookupTables() *configLookupTablesT {
 }
 
 func (this *configLookupTablesT) checkDependenciesForSetLagIntfMember(lagName string, ifname string) error {
-	var err error
-	strBuilder := strings.Builder{}
 	intfIdx, exists := this.idxByEthName[ifname]
 	if !exists {
 		return fmt.Errorf("Ethernet interface %s does not exists", ifname)
 	}
 
-	lagIdx, exists := this.idxByLagName[lagName]
-	if exists {
-		if lagIdx == this.lagByEth[intfIdx] {
-			msg := fmt.Sprintf("Ethernet interface %s is already member of LAG %s", ifname, lagName)
+	var err error
+	strBuilder := strings.Builder{}
+	if _, exists := this.idxByLagName[lagName]; exists {
+		configuredLagIdx, exists := this.lagByEth[intfIdx]
+		if exists {
+			msg := fmt.Sprintf("Ethernet interface %s is already member of LAG %s", ifname, this.lagNameByIdx[configuredLagIdx])
 			if _, err = strBuilder.WriteString(msg); err != nil {
 				return err
 			}
 		}
-		// TODO: Check if Ethernet interface is not member of other LAG
+	} else {
+		msg := fmt.Sprintf("LAG interface %s does not exist", lagName)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
+func (this *configLookupTablesT) checkDependenciesForDeleteLagIntfMember(lagName string, ifname string) error {
+	intfIdx, exists := this.idxByEthName[ifname]
+	if !exists {
+		return fmt.Errorf("Ethernet interface %s does not exist", ifname)
+	}
+
+	var err error
+	strBuilder := strings.Builder{}
+	lagIdx, exists := this.idxByLagName[lagName]
+	if !exists {
+		msg := fmt.Sprintf("LAG %s does not exist", lagName)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	if this.lagByEth[intfIdx] != lagIdx {
+		msg := fmt.Sprintf("Ethernet interface %s does not exists in LAG %s", ifname, lagName)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
 }
 
 func (this *configLookupTablesT) setLagIntfMember(lagName string, ifname string) error {
@@ -153,20 +191,23 @@ func (this *configLookupTablesT) setLagIntfMember(lagName string, ifname string)
 	return nil
 }
 
-func (this *configLookupTablesT) checkDependenciesForDeleteOrRemoveEthIntfFromLagIntf(ifname string, lagName string) error {
+func (this *configLookupTablesT) deleteLagIntfMember(lagName string, ifname string) error {
 	intfIdx, exists := this.idxByEthName[ifname]
 	if !exists {
-		return fmt.Errorf("Ethernet interface %s does not exists", ifname)
+		return fmt.Errorf("Ethernet interface %s does not exist", ifname)
 	}
 
-	expectedLagIdx, exists := this.idxByLagName[lagName]
+	lagIdx, exists := this.idxByLagName[lagName]
 	if !exists {
-		return fmt.Errorf("LAG %s does not exists", lagName)
+		return fmt.Errorf("LAG %s does not exist", lagName)
 	}
 
-	if this.lagByEth[intfIdx] != expectedLagIdx {
-		return fmt.Errorf("Ethernet interface %s does not exists in LAG %s", ifname, lagName)
+	if this.lagByEth[intfIdx] != lagIdx {
+		return fmt.Errorf("Ethernet interface %s in not member of LAG %s", ifname, lagName)
 	}
+
+	delete(this.lagByEth, intfIdx)
+	this.ethByLag[lagIdx].Delete(intfIdx)
 
 	return nil
 }
@@ -959,7 +1000,7 @@ func (t *configLookupTablesT) parseVlanForLagIntf(lagName string, swVlan *oc.Int
 		nativeVid := lib.VidT(swVlan.GetNativeVlan())
 		if nativeVid != 0 {
 			t.setNativeVlanOnLag(lagName, nativeVid)
-			log.Infof("Set native VLAN %d for LAG %s", lagName, nativeVid)
+			log.Infof("Set native VLAN %d for LAG %s", nativeVid, lagName)
 		}
 
 		trunkVlans := swVlan.GetTrunkVlans()
@@ -1181,9 +1222,12 @@ func (t *configLookupTablesT) dump() {
 	}
 	sort.Strings(lags)
 	log.Infof("There are %d LAG interfaces", len(lags))
-	log.Infoln("Print list of LAG interfaces:")
+	log.Infoln("Print list of LAG interfaces and their members:")
 	for _, lagName := range lags {
-		log.Infoln(lagName)
+		log.Infof("%s", lagName)
+		for _, ethIntf := range t.ethByLag[t.idxByLagName[lagName]].IdxTs() {
+			log.Infof("  %s", t.intfNameByIdx[ethIntf])
+		}
 	}
 
 	log.Infoln("========================================")

@@ -292,38 +292,36 @@ func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgm
 	return nil
 }
 
-func (this *ConfigMngrT) processSetIpv4AddrEthIntfFromChangelog(changelog *DiffChangelogMgmtT) (int, error) {
-	var count int = 0
+func (this *ConfigMngrT) processSetIpv4AddrEthIntfFromChangelog(changelog *DiffChangelogMgmtT) error {
 	for {
 		// Repeat till there is not any change related to delete IPv4 address from Ethernet interface
 		if change, exists := this.FindSetIpv4AddrEthSubintfIp(changelog); exists {
 			if err := this.validateSetIpv4AddrEthIntf(change, changelog); err != nil {
-				return 0, err
+				return err
 			}
-
-			count++
 		} else {
 			break
 		}
 	}
 
-	return count, nil
+	return nil
 }
 
-func (this *ConfigMngrT) processDeleteIpv4AddrEthIntfFromChangelog(changelog *DiffChangelogMgmtT) (int, error) {
-	var count int = 0
+func (this *ConfigMngrT) processDeleteIpv4AddrEthIntfFromChangelog(changelog *DiffChangelogMgmtT) error {
+	if changelog.isProcessed() {
+		return nil
+	}
+
 	for {
 		// Repeat till there is not any change related to delete IPv4 address from Ethernet interface
 		if change, exists := this.FindDeleteIpv4AddrEthSubintfIp(changelog); exists {
 			if err := this.validateDeleteIpv4AddrEthIntf(change, changelog); err != nil {
-				return 0, err
+				return err
 			}
-
-			count++
 		} else {
 			break
 		}
 	}
 
-	return count, nil
+	return nil
 }
