@@ -110,6 +110,49 @@ func newConfigLookupTables() *configLookupTablesT {
 	}
 }
 
+func (this *configLookupTablesT) checkDependenciesForSetLagIntfMember(lagName string, ifname string) error {
+	var err error
+	strBuilder := strings.Builder{}
+	intfIdx, exists := this.idxByEthName[ifname]
+	if !exists {
+		return fmt.Errorf("Ethernet interface %s does not exists", ifname)
+	}
+
+	lagIdx, exists := this.idxByLagName[lagName]
+	if exists {
+		if lagIdx == this.lagByEth[intfIdx] {
+			msg := fmt.Sprintf("Ethernet interface %s is already member of LAG %s", ifname, lagName)
+			if _, err = strBuilder.WriteString(msg); err != nil {
+				return err
+			}
+		}
+		// TODO: Check if Ethernet interface is not member of other LAG
+	}
+
+	return nil
+}
+
+func (this *configLookupTablesT) setLagIntfMember(lagName string, ifname string) error {
+	intfIdx, exists := this.idxByEthName[ifname]
+	if !exists {
+		return fmt.Errorf("Ethernet interface %s does not exists", ifname)
+	}
+
+	lagIdx, exists := this.idxByLagName[lagName]
+	if !exists {
+		if err := this.addNewInterfaceIfItDoesNotExist(lagName); err != nil {
+			return err
+		}
+	}
+
+	if !this.ethByLag[lagIdx].Has(intfIdx) {
+		this.ethByLag[lagIdx].Add(intfIdx)
+		this.lagByEth[intfIdx] = lagIdx
+	}
+
+	return nil
+}
+
 func (this *configLookupTablesT) checkDependenciesForDeleteOrRemoveEthIntfFromLagIntf(ifname string, lagName string) error {
 	intfIdx, exists := this.idxByEthName[ifname]
 	if !exists {

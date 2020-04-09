@@ -43,7 +43,8 @@ const (
 	setPortAutoNegForEthIntfC                       // Enable or disable auto-negotiation on port
 	setPortMtuForEthIntfC                           // Set MTU on port
 	setPortSpeedForEthIntfC                         // Set port speed
-	setLagIntfC                                     // Add LAG interface
+	setNewLagIntfC                                  // Create new LAG interface
+	setLagIntfMemberC                               // Add Ethernet interface to LAG
 	setIpv4AddrForEthIntfC                          // Assign IPv4/CIDRv4 address to Ethernet interface
 	setIpv4AddrForLagIntfC                          // Assign IPv4/CIDRv4 address to LAG interface
 	setIpv6AddrForEthIntfC                          // Assign IPv6/CIDRv6 address to Ethernet interface
@@ -440,6 +441,13 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 			break
 		}
 		if cnt, err = this.processSetPortBreakoutChanSpeedFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		countChanges -= cnt
+		if countChanges <= 0 {
+			break
+		}
+		if cnt, err = this.processSetLagIntfMemberFromChangelog(diffChangelog); err != nil {
 			return err
 		}
 		countChanges -= cnt
