@@ -343,6 +343,10 @@ func (this *ConfigMngrT) processSetPortBreakoutFromChangelog(changelog *DiffChan
 }
 
 func (this *ConfigMngrT) processSetPortBreakoutChanSpeedFromChangelog(changelog *DiffChangelogMgmtT) error {
+	if changelog.isProcessed() {
+		return nil
+	}
+
 	for {
 		// Repeat till there is not any change related to set port breakout channel speed for subports
 		if change, exists := this.findSetPortBreakoutChanSpeed(changelog); exists {
