@@ -293,6 +293,10 @@ func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgm
 }
 
 func (this *ConfigMngrT) processSetIpv4AddrEthIntfFromChangelog(changelog *DiffChangelogMgmtT) error {
+	if changelog.isProcessed() {
+		return nil
+	}
+
 	for {
 		// Repeat till there is not any change related to delete IPv4 address from Ethernet interface
 		if change, exists := this.FindSetIpv4AddrEthSubintfIp(changelog); exists {
