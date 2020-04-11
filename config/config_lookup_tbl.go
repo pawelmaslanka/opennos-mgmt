@@ -170,6 +170,41 @@ func (this *configLookupTablesT) checkDependenciesForDeleteLagIntfMember(lagName
 	return errors.New(strBuilder.String())
 }
 
+func (this *configLookupTablesT) checkDependenciesForSetLagIntf(lagName string) error {
+	var err error
+	strBuilder := strings.Builder{}
+	if lagIdx, exists := this.idxByLagName[lagName]; exists {
+		if _, err = strBuilder.WriteString("LAG already exists\n"); err != nil {
+			return err
+		}
+
+		ethIntfs, exists := this.ethByLag[lagIdx]
+		if exists && (ethIntfs.Size() > 0) {
+			msg := fmt.Sprintf("There are also active %d LAG members:", ethIntfs.Size())
+			if _, err = strBuilder.WriteString(msg); err != nil {
+				return err
+			}
+
+			for _, ethIdx := range ethIntfs.IdxTs() {
+				msg = fmt.Sprintf(" %s", this.intfNameByIdx[ethIdx])
+				if _, err = strBuilder.WriteString(msg); err != nil {
+					return err
+				}
+			}
+
+			if _, err = strBuilder.WriteString("\n"); err != nil {
+				return err
+			}
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
 func (this *configLookupTablesT) checkDependenciesForDeleteLagIntf(lagName string) error {
 	var err error
 	strBuilder := strings.Builder{}
@@ -211,9 +246,11 @@ func (this *configLookupTablesT) setLagIntfMember(lagName string, ifname string)
 
 	lagIdx, exists := this.idxByLagName[lagName]
 	if !exists {
-		if err := this.addNewInterfaceIfItDoesNotExist(lagName); err != nil {
-			return err
-		}
+		return fmt.Errorf("LAG interface %s does not exist", lagName)
+	}
+
+	if _, exists := this.ethByLag[lagIdx]; !exists {
+		this.ethByLag[lagIdx] = lib.NewIdxTSet()
 	}
 
 	if !this.ethByLag[lagIdx].Has(intfIdx) {
@@ -236,11 +273,23 @@ func (this *configLookupTablesT) deleteLagIntfMember(lagName string, ifname stri
 	}
 
 	if this.lagByEth[intfIdx] != lagIdx {
-		return fmt.Errorf("Ethernet interface %s in not member of LAG %s", ifname, lagName)
+		return fmt.Errorf("Ethernet interface %s is not member of LAG %s", ifname, lagName)
 	}
 
 	delete(this.lagByEth, intfIdx)
 	this.ethByLag[lagIdx].Delete(intfIdx)
+
+	return nil
+}
+
+func (this *configLookupTablesT) setLagIntf(lagName string) error {
+	if _, exists := this.idxByLagName[lagName]; exists {
+		return fmt.Errorf("LAG %s already exist", lagName)
+	}
+
+	if err := this.addNewInterfaceIfItDoesNotExist(lagName); err != nil {
+		return err
+	}
 
 	return nil
 }

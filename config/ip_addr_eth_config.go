@@ -224,7 +224,7 @@ func (this *ConfigMngrT) validateSetIpv4AddrEthIntf(changeItem *DiffChangeMgmtT,
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendCmdToTransactionByIfname(ifname, setIpv4AddrEthIntfCmd, setIpv4AddrForEthIntfC); err != nil {
+		if err = this.appendCmdToTransaction(ifname, setIpv4AddrEthIntfCmd, setIpv4AddrForEthIntfC); err != nil {
 			return err
 		}
 
@@ -277,7 +277,7 @@ func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgm
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendCmdToTransactionByIfname(ifname, deleteIpv4AddrEthIntfCmd, deleteIpv4AddrFromEthIntfC); err != nil {
+		if err = this.appendCmdToTransaction(ifname, deleteIpv4AddrEthIntfCmd, deleteIpv4AddrFromEthIntfC); err != nil {
 			return err
 		}
 

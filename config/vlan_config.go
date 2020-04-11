@@ -199,7 +199,7 @@ func (this *ConfigMngrT) validateSetVlanModeEthIntfChange(changeItem *DiffChange
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransactionByIfname(ifname, setVlanModeEthIntfCmd, setVlanModeForEthIntfC); err != nil {
+		if err := this.appendCmdToTransaction(ifname, setVlanModeEthIntfCmd, setVlanModeForEthIntfC); err != nil {
 			return err
 		}
 
@@ -249,7 +249,7 @@ func (this *ConfigMngrT) validateSetAccessVlanEthIntfChange(changeItem *DiffChan
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransactionByIfname(ifname, setAccessVlanEthIntfCmd, setAccessVlanForEthIntfC); err != nil {
+		if err := this.appendCmdToTransaction(ifname, setAccessVlanEthIntfCmd, setAccessVlanForEthIntfC); err != nil {
 			return err
 		}
 
@@ -284,7 +284,7 @@ func (this *ConfigMngrT) validateDeleteAccessVlanEthIntfChange(changeItem *DiffC
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendCmdToTransactionByIfname(ifname, deleteAccessVlanEthIntfCmd, deleteEthIntfFromAccessVlanC); err != nil {
+		if err = this.appendCmdToTransaction(ifname, deleteAccessVlanEthIntfCmd, deleteEthIntfFromAccessVlanC); err != nil {
 			return err
 		}
 
@@ -344,7 +344,7 @@ func (this *ConfigMngrT) validateSetNativeVlanEthIntfChange(changeItem *DiffChan
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransactionByIfname(ifname, setNativeVlanEthIntfCmd, setNativeVlanForEthIntfC); err != nil {
+		if err := this.appendCmdToTransaction(ifname, setNativeVlanEthIntfCmd, setNativeVlanForEthIntfC); err != nil {
 			return err
 		}
 
@@ -379,7 +379,7 @@ func (this *ConfigMngrT) validateDeleteNativeVlanEthIntfChange(changeItem *DiffC
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendCmdToTransactionByIfname(ifname, deleteNativeVlanEthIntfCmd, deleteEthIntfFromNativeVlanC); err != nil {
+		if err = this.appendCmdToTransaction(ifname, deleteNativeVlanEthIntfCmd, deleteEthIntfFromNativeVlanC); err != nil {
 			return err
 		}
 
@@ -439,7 +439,7 @@ func (this *ConfigMngrT) validateSetTrunkVlanEthIntfChange(changeItem *DiffChang
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendCmdToTransactionByIfname(ifname, setTrunkVlanEthIntfCmd, setTrunkVlanForEthIntfC); err != nil {
+		if err = this.appendCmdToTransaction(ifname, setTrunkVlanEthIntfCmd, setTrunkVlanForEthIntfC); err != nil {
 			return err
 		}
 
@@ -477,7 +477,7 @@ func (this *ConfigMngrT) validateDeleteTrunkVlanEthIntfChange(changeItem *DiffCh
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendCmdToTransactionByIfname(ifname, deleteTrunkVlanEthIntfCmd, deleteEthIntfFromTrunkVlanC); err != nil {
+		if err = this.appendCmdToTransaction(ifname, deleteTrunkVlanEthIntfCmd, deleteEthIntfFromTrunkVlanC); err != nil {
 			return err
 		}
 

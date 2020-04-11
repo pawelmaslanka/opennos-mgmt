@@ -77,6 +77,11 @@ cd text && go get ./...
 cd $GOPATH/src/github.com/openconfig/ygot/proto/yext && go generate
 cd $GOPATH/src/github.com/openconfig/ygot/proto/ywrapper && go generate
 
+mkdir -p $GOPATH/src/github.com/pawelmaslanka
+cd $GOPATH/src/github.com/pawelmaslanka
+git clone git@github.com:pawelmaslanka/opennos-mgmt.git
+cd opennos-mgmt
+go mod init github.com/pawelmaslanka/opennos-mgmt
 
 # If there is problem with the followig errors:
 # github.com/openconfig/ygot/ygot

@@ -45,7 +45,7 @@ const (
 	setPortAutoNegForEthIntfC                       // Enable or disable auto-negotiation on port
 	setPortMtuForEthIntfC                           // Set MTU on port
 	setPortSpeedForEthIntfC                         // Set port speed
-	setNewLagIntfC                                  // Create new LAG interface
+	setLagIntfC                                     // Create new LAG interface
 	setLagIntfParamsC                               // Set LAG parameters
 	setLagIntfMemberC                               // Add Ethernet interface to LAG
 	setIpv4AddrForEthIntfC                          // Assign IPv4/CIDRv4 address to Ethernet interface
@@ -315,7 +315,7 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 	return this.CommitCandidateConfig(&configModel)
 }
 
-func (this *ConfigMngrT) appendCmdToTransactionByIfname(ifname string, cmdAdd cmd.CommandI, idx OrdinalNumberT) error {
+func (this *ConfigMngrT) appendCmdToTransaction(ifname string, cmdAdd cmd.CommandI, idx OrdinalNumberT) error {
 	cmds := this.cmdByIfname[idx]
 	for _, command := range cmds {
 		if command.Equals(cmdAdd) {
@@ -428,6 +428,9 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 			return err
 		}
 		if err = this.processSetPortBreakoutChanSpeedFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetLagIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
 		if err = this.processSetLagIntfMemberFromChangelog(diffChangelog); err != nil {

@@ -52,7 +52,7 @@ func (this *ConfigMngrT) validateSetLagIntfMemberChange(changeItem *DiffChangeMg
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransactionByIfname(ifname, setLagIntfMemberCmd, setLagIntfMemberC); err != nil {
+		if err := this.appendCmdToTransaction(ifname, setLagIntfMemberCmd, setLagIntfMemberC); err != nil {
 			return err
 		}
 
@@ -84,7 +84,7 @@ func (this *ConfigMngrT) validateDeleteLagIntfMemberChange(changeItem *DiffChang
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransactionByIfname(ifname, deleteLagIntfMemberCmd, deleteLagIntfMemberC); err != nil {
+		if err := this.appendCmdToTransaction(ifname, deleteLagIntfMemberCmd, deleteLagIntfMemberC); err != nil {
 			return err
 		}
 
@@ -114,11 +114,40 @@ func (this *ConfigMngrT) validateDeleteLagIntfMemberChange(changeItem *DiffChang
 	return nil
 }
 
+func (this *ConfigMngrT) validateSetLagIntfChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+	lagName, err := convertInterfaceIntoString(changeItem.Change.To)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("Requested set LAG interface %s", lagName)
+	setLagIntfCmd := cmd.NewSetLagIntfCmdT(changeItem.Change, this.ethSwitchMgmtClient)
+	if err := this.transConfigLookupTbl.checkDependenciesForSetLagIntf(lagName); err != nil {
+		return fmt.Errorf("Cannot %q because there are dependencies from LAG interface %s:\n%s",
+			setLagIntfCmd.GetName(), lagName, err)
+	}
+
+	if this.transHasBeenStarted {
+		if err := this.appendCmdToTransaction(lagName, setLagIntfCmd, setLagIntfC); err != nil {
+			return err
+		}
+
+		if err := this.transConfigLookupTbl.setLagIntf(lagName); err != nil {
+			return err
+		}
+
+		changeItem.MarkAsProcessed()
+	}
+
+	return nil
+}
+
 func (this *ConfigMngrT) validateDeleteLagIntfChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
 	lagName, err := convertInterfaceIntoString(changeItem.Change.From)
 	if err != nil {
 		return err
 	}
+
 	log.Infof("Requested delete LAG interface %s", lagName)
 	deleteLagIntfCmd := cmd.NewDeleteLagIntfCmdT(changeItem.Change, this.ethSwitchMgmtClient)
 	if err := this.transConfigLookupTbl.checkDependenciesForDeleteLagIntf(lagName); err != nil {
@@ -127,7 +156,7 @@ func (this *ConfigMngrT) validateDeleteLagIntfChange(changeItem *DiffChangeMgmtT
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransactionByIfname(lagName, deleteLagIntfCmd, deleteLagIntfC); err != nil {
+		if err := this.appendCmdToTransaction(lagName, deleteLagIntfCmd, deleteLagIntfC); err != nil {
 			return err
 		}
 
@@ -163,6 +192,22 @@ func findDeleteLagIntfMemberChange(changelog *DiffChangelogMgmtT) (change *DiffC
 			if ch.Change.Type == diff.UPDATE {
 				if isChangedLagIntfMember(ch.Change) {
 					if ch.Change.From != nil {
+						return ch, true
+					}
+				}
+			}
+		}
+	}
+
+	return nil, false
+}
+
+func findSetLagIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
+	for _, ch := range changelog.Changes {
+		if !ch.IsProcessed() {
+			if ch.Change.Type == diff.CREATE {
+				if isChangedLagIntf(ch.Change) {
+					if ch.Change.To != nil {
 						return ch, true
 					}
 				}
@@ -217,6 +262,25 @@ func (this *ConfigMngrT) processDeleteLagIntfMemberFromChangelog(changelog *Diff
 		// Repeat till there is not any change related to delete LAG interface member
 		if change, exists := findDeleteLagIntfMemberChange(changelog); exists {
 			if err := this.validateDeleteLagIntfMemberChange(change, changelog); err != nil {
+				return err
+			}
+		} else {
+			break
+		}
+	}
+
+	return nil
+}
+
+func (this *ConfigMngrT) processSetLagIntfFromChangelog(changelog *DiffChangelogMgmtT) error {
+	if changelog.isProcessed() {
+		return nil
+	}
+
+	for {
+		// Repeat till there is not any change related to set LAG interface
+		if change, exists := findSetLagIntfChange(changelog); exists {
+			if err := this.validateSetLagIntfChange(change, changelog); err != nil {
 				return err
 			}
 		} else {

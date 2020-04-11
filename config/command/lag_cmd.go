@@ -26,7 +26,57 @@ const (
 	maxLagChangeIdxC
 )
 
-// DeleteLagIntfCmdT implements command for LAG interface
+// SetLagIntfCmdT implements command for creating LAG interface
+type SetLagIntfCmdT struct {
+	*commandT // commandT is embedded as a pointer because its state will be modify
+}
+
+// NewSetLagIntfCmdT creates new instance of SetLagIntfCmdT type
+func NewSetLagIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetLagIntfCmdT {
+	changes := make([]*diff.Change, maxLagChangeIdxC)
+	changes[lagChangeIdxC] = vlan
+	return &SetLagIntfCmdT{
+		commandT: newCommandT("set lag interface", changes, ethSwitchMgmt),
+	}
+}
+
+// Execute implements the same method from CommandI interface and creates LAG interface
+func (this *SetLagIntfCmdT) Execute() error {
+	shouldBeAbleOnlyToUndo := false
+	return this.doSetLagIntfCmd(shouldBeAbleOnlyToUndo)
+}
+
+// Undo implements the same method from CommandI interface and withdraws changes performed by
+// previously execution of Execute() method
+func (this *SetLagIntfCmdT) Undo() error {
+	shouldBeAbleOnlyToUndo := true
+	return this.doSetLagIntfCmd(shouldBeAbleOnlyToUndo)
+}
+
+// GetName implements the same method from CommandI interface and returns name of command
+func (this *SetLagIntfCmdT) GetName() string {
+	return this.name
+}
+
+// Equals checks if 'this' command and 'other' command are the same... do the same thing
+func (this *SetLagIntfCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*SetLagIntfCmdT)
+	return this.equals(otherCmd.commandT)
+}
+
+func (this *commandT) doSetLagIntfCmd(shouldBeAbleOnlyToUndo bool) error {
+	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return this.createErrorAccordingToExecutionState()
+	}
+
+	this.dumpInternalData()
+	// TODO: Make implementations
+
+	this.finalize()
+	return nil
+}
+
+// DeleteLagIntfCmdT implements command for deletion of LAG interface
 type DeleteLagIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
 }
