@@ -127,7 +127,8 @@ func SaveConfigFile(config ygot.ValidatedGoStruct, filename string) error {
 	nodeStruct, _ := node.(ygot.GoStruct)
 	// Return IETF JSON by default.
 	jsonEncoder := func() (map[string]interface{}, error) {
-		return ygot.ConstructIETFJSON(nodeStruct, &ygot.RFC7951JSONConfig{AppendModuleName: true})
+		// AppendModuleName determines whether the module name is appended to elements
+		return ygot.ConstructIETFJSON(nodeStruct, &ygot.RFC7951JSONConfig{AppendModuleName: false})
 	}
 	jsonType := "IETF"
 	jsonTree, err := jsonEncoder()
