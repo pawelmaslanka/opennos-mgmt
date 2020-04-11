@@ -170,6 +170,39 @@ func (this *configLookupTablesT) checkDependenciesForDeleteLagIntfMember(lagName
 	return errors.New(strBuilder.String())
 }
 
+func (this *configLookupTablesT) checkDependenciesForDeleteLagIntf(lagName string) error {
+	var err error
+	strBuilder := strings.Builder{}
+	if lagIdx, exists := this.idxByLagName[lagName]; !exists {
+		if _, err = strBuilder.WriteString("LAG does not exist"); err != nil {
+			return err
+		}
+	} else {
+		ethIntfs, exists := this.ethByLag[lagIdx]
+		if exists && (ethIntfs.Size() > 0) {
+			msg := fmt.Sprintf("There are active %d LAG members:", ethIntfs.Size())
+			if _, err = strBuilder.WriteString(msg); err != nil {
+				return err
+			}
+			for _, ethIdx := range ethIntfs.IdxTs() {
+				msg = fmt.Sprintf(" %s", this.intfNameByIdx[ethIdx])
+				if _, err = strBuilder.WriteString(msg); err != nil {
+					return err
+				}
+			}
+			if _, err = strBuilder.WriteString("\n"); err != nil {
+				return err
+			}
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
+}
+
 func (this *configLookupTablesT) setLagIntfMember(lagName string, ifname string) error {
 	intfIdx, exists := this.idxByEthName[ifname]
 	if !exists {
@@ -212,37 +245,16 @@ func (this *configLookupTablesT) deleteLagIntfMember(lagName string, ifname stri
 	return nil
 }
 
-func (this *configLookupTablesT) checkDependenciesForDeleteOrRemoveLagIntf(lagName string) error {
-	var err error
-	strBuilder := strings.Builder{}
+func (this *configLookupTablesT) deleteLagIntf(lagName string) error {
 	lagIdx, exists := this.idxByLagName[lagName]
 	if !exists {
-		return fmt.Errorf("LAG %s does not exists", lagName)
+		return fmt.Errorf("LAG %s does not exist", lagName)
 	}
 
-	if intfs, exists := this.ethByLag[lagIdx]; exists {
-		if intfs.Size() > 0 {
-			if _, err = strBuilder.WriteString("LAG members:"); err != nil {
-				return err
-			}
+	delete(this.idxByLagName, lagName)
+	delete(this.lagNameByIdx, lagIdx)
 
-			for _, intfIdx := range intfs.IdxTs() {
-				if _, err = strBuilder.WriteString(fmt.Sprintf(" %s", this.intfNameByIdx[intfIdx])); err != nil {
-					return err
-				}
-			}
-
-			if _, err = strBuilder.WriteString("\n"); err != nil {
-				return err
-			}
-		}
-	}
-
-	if strBuilder.Len() == 0 {
-		return nil
-	}
-
-	return errors.New(strBuilder.String())
+	return nil
 }
 
 func (this *configLookupTablesT) checkDependenciesForSetIpv4AddrForEthIntf(ifname string, cidr4 string) error {

@@ -156,6 +156,14 @@
         }
       },
       {
+        "name": "ae-3",
+        "aggregation": {
+          "config": {
+            "lag-type": "STATIC"
+          }
+        }
+      },
+      {
         "name": "eth-1",
         "config": {
           "description": "QSFP28 No. 1 port with breakout mode capability",
@@ -265,7 +273,7 @@
         },
         "ethernet": {
           "config": {
-            "aggregate-id": "ae-1",
+            "aggregate-id": "ae-3",
             "auto-negotiate": false,
             "mac-address": "01:02:03:04:05:13",
             "port-speed": "SPEED_100GB"

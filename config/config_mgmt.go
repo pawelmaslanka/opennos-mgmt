@@ -35,6 +35,7 @@ const (
 	deleteLagIntfFromNativeVlanC                    // Remove LAG interface from native VLAN
 	deleteEthIntfFromTrunkVlanC                     // Remove Ethernet interface from trunk VLAN
 	deleteEthIntfFromLagIntfC                       // Remove Ethernet interface from LAG membership
+	deleteLagIntfParamsC                            // Remove LAG parameters
 	deleteLagIntfMemberC                            // Remove Ethernet interface from LAG
 	deleteLagIntfC                                  // Delete LAG interface
 	deletePortBreakoutC                             // Combine multiple logical ports into single port
@@ -45,6 +46,7 @@ const (
 	setPortMtuForEthIntfC                           // Set MTU on port
 	setPortSpeedForEthIntfC                         // Set port speed
 	setNewLagIntfC                                  // Create new LAG interface
+	setLagIntfParamsC                               // Set LAG parameters
 	setLagIntfMemberC                               // Add Ethernet interface to LAG
 	setIpv4AddrForEthIntfC                          // Assign IPv4/CIDRv4 address to Ethernet interface
 	setIpv4AddrForLagIntfC                          // Assign IPv4/CIDRv4 address to LAG interface
@@ -416,6 +418,9 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 			return err
 		}
 		if err = this.processDeleteLagIntfMemberFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processDeleteLagIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
 		// Set section
