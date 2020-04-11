@@ -1,12 +1,23 @@
 package gnmi
 
 import (
+	"encoding/json"
 	"fmt"
+	"opennos-mgmt/gnmi/modeldata"
+	"opennos-mgmt/gnmi/modeldata/oc"
+	"os"
+	"reflect"
 	"strconv"
 
 	log "github.com/golang/glog"
 	"github.com/openconfig/goyang/pkg/yang"
+	"github.com/openconfig/ygot/experimental/ygotutils"
+	"github.com/openconfig/ygot/ygot"
+	cpb "google.golang.org/genproto/googleapis/rpc/code"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"github.com/openconfig/gnmi/proto/gnmi"
 	pb "github.com/openconfig/gnmi/proto/gnmi"
 )
 
@@ -99,4 +110,47 @@ func getKeyedListEntry(node map[string]interface{}, elem *pb.PathElem, createIfN
 	}
 	node[elem.Name] = append(keyedList, m)
 	return m
+}
+
+func SaveConfigFile(config ygot.ValidatedGoStruct, filename string) error {
+	model := NewModel(modeldata.ModelData,
+		reflect.TypeOf((*oc.Device)(nil)),
+		oc.SchemaTree["Device"],
+		oc.Unmarshal,
+		oc.ΛEnum)
+	nilPath := &gnmi.Path{}
+	node, stat := ygotutils.GetNode(model.schemaTreeRoot, config, nilPath)
+	if isNil(node) || stat.GetCode() != int32(cpb.Code_OK) {
+		return status.Errorf(codes.NotFound, "root path not found")
+	}
+
+	nodeStruct, _ := node.(ygot.GoStruct)
+	// Return IETF JSON by default.
+	jsonEncoder := func() (map[string]interface{}, error) {
+		return ygot.ConstructIETFJSON(nodeStruct, &ygot.RFC7951JSONConfig{AppendModuleName: true})
+	}
+	jsonType := "IETF"
+	jsonTree, err := jsonEncoder()
+	if err != nil {
+		msg := fmt.Sprintf("error in constructing %s JSON tree from requested node: %v", jsonType, err)
+		log.Error(msg)
+		return status.Error(codes.Internal, msg)
+	}
+
+	jsonDump, err := json.MarshalIndent(jsonTree, "", "  ")
+	if err != nil {
+		msg := fmt.Sprintf("error in marshaling %s JSON tree to bytes: %v", jsonType, err)
+		log.Error(msg)
+		return status.Error(codes.Internal, msg)
+	}
+
+	// If the file doesn't exist, create it, or append to the file
+	file, err := os.OpenFile(filename, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Write(jsonDump)
+	return err
 }

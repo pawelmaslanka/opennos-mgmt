@@ -346,7 +346,7 @@ func (this *ConfigMngrT) IsChangedIpv4AddrEth(change *diff.Change) bool {
 func (this *ConfigMngrT) CommitCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) error {
 	// TODO: Consider if we should commit transConfigLookupTable here?
 	// var configData []byte
-	// configData, err := json.Marshal(*candidateConfig)
+	// configData, err := json.MarshalIndent(*candidateConfig, "", "  ")
 	// if err != nil {
 	// 	return err
 	// }
@@ -371,7 +371,11 @@ func (this *ConfigMngrT) CommitCandidateConfig(candidateConfig *ygot.ValidatedGo
 	// this.runningConfig, err = model.NewConfigStruct(configData)
 	// return err
 	// TODO: Make deep copy
-	return copier.Copy(&this.runningConfig, &candidateConfig)
+	if err := copier.Copy(&this.runningConfig, &candidateConfig); err != nil {
+		return err
+	}
+
+	return gnmi.SaveConfigFile(this.runningConfig, "save-config.json")
 }
 
 func (this *ConfigMngrT) GetDiffRunningConfigWithCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) (diff.Changelog, error) {
