@@ -118,12 +118,7 @@ var gnmiCallback gnmi.ConfigCallback = func(newConfig ygot.ValidatedGoStruct, cb
 		return nil
 	}
 
-	if err := configMngr.CommitChangelog(&changelog, false); err != nil {
-		return err
-	}
-
-	log.Infof("Save new config")
-	return configMngr.CommitCandidateConfig(&newConfig) // TODO: Maybe move it into DiscardOrFinishTrans()
+	return configMngr.CommitChangelog(&changelog, &newConfig)
 }
 
 func newServer(model *gnmi.Model, config []byte) (*server, error) {

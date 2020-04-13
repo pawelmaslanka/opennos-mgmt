@@ -20,7 +20,7 @@ const (
 
 	Ipv4AddrEthIntfPathItemC                       = "Interface"
 	Ipv4AddrEthSubintfPathItemC                    = "Subinterface"
-	Ipv4AddrEthSubintfIpv4PathItemC                = "Ipv4Addr"
+	Ipv4AddrEthSubintfIpv4PathItemC                = "Ipv4"
 	Ipv4AddrEthSubintfIpv4AddrPathItemC            = "Address"
 	Ipv4AddrEthSubintfIpv4AddrPartIpPathItemC      = "Ip"
 	Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemC = "PrefixLength"

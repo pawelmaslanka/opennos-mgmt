@@ -1,0 +1,111 @@
+module openconfig-management {
+
+  yang-version "1";
+
+  // namespace
+  namespace "http://openconfig.net/yang/management";
+
+  prefix "oc-config";
+
+  // meta
+  organization "OpenConfig working group";
+
+  contact
+    "OpenConfig working group
+    www.openconfig.net";
+
+  description
+    "This module describes transaction activity of device configuration.";
+
+  oc-ext:openconfig-version "1.1.1";
+
+  revision "2020-04-10" {
+    description
+      "OpenConfig public release";
+    reference "1.0.2";
+  }
+
+  // OpenConfig specific extensions for module metadata.
+  oc-ext:catalog-organization "openconfig";
+  oc-ext:origin "openconfig";
+
+  identity TRANS_TYPE {
+    description
+      "Base identity for types of transaction action sets";
+  }
+
+  identity TRANS_DRY_RUN {
+    base TRANS_TYPE;
+    description
+      "Just checks changes sent to the device if they are valid";
+  }
+
+  identity TRANS_COMMIT {
+    base TRANS_TYPE;
+    description
+      "Committed changes does not require confirmation to be applied permanently";
+  }
+
+  identity TRANS_COMMIT_CONFIRM {
+    base TRANS_TYPE;
+    description
+      "Committed changes requires confirmation to be applied permanently";
+  }
+
+  identity TRANS_CONFIRM {
+    base TRANS_TYPE;
+    description
+      "Recently committed changes are going to be applied permanently";
+  }
+
+  identity TRANS_DISCARD_CHANGES {
+    base TRANS_TYPE;
+    description
+      "Discards recently commited changes if there were not confirmed yet";
+  }
+
+  identity TRANS_ROLLBACK {
+    base TRANS_TYPE;
+    description
+      "Withdraws recently commited changes if there were not applied permanently yet";
+  }
+
+  container management {
+    description
+      "Enclosing container for the configuration management of device";
+    container transaction {
+      typedef timeout {
+        type uint16 {
+          range 1..600;
+        }
+      }
+
+      leaf default-config-action {
+        config false;
+        type identityref {
+          base TRANS_TYPE;
+        }
+        default TRANS_COMMIT;
+        description
+          "Controls what action is going to be applied to changes requested by user.
+          This is default setting";
+      }
+
+      leaf config-action {
+        type identityref {
+          base TRANS_TYPE;
+        }
+        default TRANS_COMMIT;
+        description
+          "Controls what action is going to be applied to changes requested by user";
+      }
+
+      leaf commit-confirm-timeout {
+        type timeout;
+        default 120;
+        description
+          "Timeout (in seconds) after which committed changes will be withdrawn";
+      }
+    }
+  }
+}

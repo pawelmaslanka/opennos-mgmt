@@ -2,6 +2,9 @@
   "components": {
     "component": [
       {
+        "config": {
+          "name": "eth-1"
+        },
         "name": "eth-1",
         "port": {
           "breakout-mode": {
@@ -18,6 +21,9 @@
         }
       },
       {
+        "config": {
+          "name": "eth-2"
+        },
         "name": "eth-2",
         "port": {
           "breakout-mode": {
@@ -34,6 +40,9 @@
         }
       },
       {
+        "config": {
+          "name": "eth-3"
+        },
         "name": "eth-3",
         "port": {
           "breakout-mode": {
@@ -50,6 +59,9 @@
         }
       },
       {
+        "config": {
+          "name": "eth-4"
+        },
         "name": "eth-4",
         "port": {
           "breakout-mode": {
@@ -66,6 +78,9 @@
         }
       },
       {
+        "config": {
+          "name": "eth-5"
+        },
         "name": "eth-5",
         "port": {
           "breakout-mode": {
@@ -82,12 +97,15 @@
         }
       },
       {
+        "config": {
+          "name": "eth-6"
+        },
         "name": "eth-6",
         "port": {
           "breakout-mode": {
             "config": {
-              "channel-speed": "SPEED_10GB",
-              "num-channels": 4
+              "channel-speed": "SPEED_100GB",
+              "num-channels": 1
             }
           }
         },
@@ -98,6 +116,9 @@
         }
       },
       {
+        "config": {
+          "name": "eth-7"
+        },
         "name": "eth-7",
         "port": {
           "breakout-mode": {
@@ -118,7 +139,6 @@
   "interfaces": {
     "interface": [
       {
-        "name": "ae-1",
         "aggregation": {
           "config": {
             "lag-type": "LACP"
@@ -134,10 +154,13 @@
               ]
             }
           }
-        }
+        },
+        "config": {
+          "name": "ae-1"
+        },
+        "name": "ae-1"
       },
       {
-        "name": "ae-2",
         "aggregation": {
           "config": {
             "lag-type": "LACP"
@@ -146,28 +169,35 @@
             "config": {
               "access-vlan": 1,
               "interface-mode": "TRUNK",
-              "native-vlan": 222,
+              "native-vlan": 20,
               "trunk-vlans": [
                 700,
                 800
               ]
             }
           }
-        }
+        },
+        "config": {
+          "name": "ae-2"
+        },
+        "name": "ae-2"
       },
       {
-        "name": "ae-3",
         "aggregation": {
           "config": {
             "lag-type": "STATIC"
           }
-        }
+        },
+        "config": {
+          "name": "ae-3"
+        },
+        "name": "ae-3"
       },
       {
-        "name": "eth-1",
         "config": {
           "description": "QSFP28 No. 1 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-1"
         },
         "ethernet": {
           "config": {
@@ -187,38 +217,41 @@
             }
           }
         },
+        "name": "eth-1",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Master port",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
+              "index": 0,
               "ipv4": {
                 "addresses": {
                   "address": [
                     {
                       "config": {
-                        "ip": "10.0.10.11",
-                        "prefix-length": 24
-                      }
+                        "ip": "11.11.11.11",
+                        "prefix-length": 26
+                      },
+                      "ip": "11.11.11.11"
                     }
                   ]
                 }
               }
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-2",
         "config": {
           "description": "QSFP28 No. 2 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-2"
         },
         "ethernet": {
           "config": {
@@ -238,38 +271,28 @@
             }
           }
         },
+        "name": "eth-2",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Master port",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.12",
-                        "prefix-length": 24
-                      }
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-3",
         "config": {
           "description": "QSFP28 No. 3 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-3"
         },
         "ethernet": {
           "config": {
@@ -290,14 +313,19 @@
             }
           }
         },
+        "name": "eth-3",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Master port",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
+              "index": 0,
               "ipv4": {
                 "addresses": {
                   "address": [
@@ -305,23 +333,21 @@
                       "config": {
                         "ip": "10.0.10.13",
                         "prefix-length": 24
-                      }
+                      },
+                      "ip": "10.0.10.13"
                     }
                   ]
                 }
               }
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-4",
         "config": {
           "description": "QSFP28 No. 4 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-4"
         },
         "ethernet": {
           "config": {
@@ -341,14 +367,19 @@
             }
           }
         },
+        "name": "eth-4",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Master port",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
+              "index": 0,
               "ipv4": {
                 "addresses": {
                   "address": [
@@ -356,23 +387,21 @@
                       "config": {
                         "ip": "10.0.10.14",
                         "prefix-length": 24
-                      }
+                      },
+                      "ip": "10.0.10.14"
                     }
                   ]
                 }
               }
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-5",
         "config": {
           "description": "QSFP28 No. 5 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-5"
         },
         "ethernet": {
           "config": {
@@ -392,14 +421,19 @@
             }
           }
         },
+        "name": "eth-5",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Master port",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
+              "index": 0,
               "ipv4": {
                 "addresses": {
                   "address": [
@@ -407,23 +441,21 @@
                       "config": {
                         "ip": "10.0.10.15",
                         "prefix-length": 24
-                      }
+                      },
+                      "ip": "10.0.10.15"
                     }
                   ]
                 }
               }
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-6",
         "config": {
           "description": "QSFP28 No. 6 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-6"
         },
         "ethernet": {
           "config": {
@@ -435,7 +467,7 @@
             "config": {
               "access-vlan": 1,
               "interface-mode": "TRUNK",
-              "native-vlan": 1,
+              "native-vlan": 111,
               "trunk-vlans": [
                 610,
                 605,
@@ -444,14 +476,19 @@
             }
           }
         },
+        "name": "eth-6",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Master port",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
+              "index": 0,
               "ipv4": {
                 "addresses": {
                   "address": [
@@ -459,23 +496,21 @@
                       "config": {
                         "ip": "10.0.10.16",
                         "prefix-length": 24
-                      }
+                      },
+                      "ip": "10.0.10.16"
                     }
                   ]
                 }
               }
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-6.1",
         "config": {
           "description": "QSFP28 No. 6 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-6.1"
         },
         "ethernet": {
           "config": {
@@ -487,45 +522,35 @@
             "config": {
               "access-vlan": 1,
               "interface-mode": "TRUNK",
-              "native-vlan": 1,
               "trunk-vlans": [
-                61
+                70,
+                73
               ]
             }
           }
         },
+        "name": "eth-6.1",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Slave port no. 1",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.61",
-                        "prefix-length": 24
-                      }
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-6.2",
         "config": {
           "description": "QSFP28 No. 6 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-6.2"
         },
         "ethernet": {
           "config": {
@@ -535,7 +560,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 20,
               "interface-mode": "ACCESS",
               "native-vlan": 1,
               "trunk-vlans": [
@@ -544,38 +568,28 @@
             }
           }
         },
+        "name": "eth-6.2",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Slave port no. 2",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.62",
-                        "prefix-length": 24
-                      }
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-6.3",
         "config": {
           "description": "QSFP28 No. 6 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-6.3"
         },
         "ethernet": {
           "config": {
@@ -586,46 +600,32 @@
           "switched-vlan": {
             "config": {
               "access-vlan": 1,
-              "interface-mode": "TRUNK",
-              "native-vlan": 1,
-              "trunk-vlans": [
-                63
-              ]
+              "interface-mode": "TRUNK"
             }
           }
+        },
+        "name": "eth-6.3",
+        "state": {
+          "admin-status": "UP"
         },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Slave port no. 3",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.63",
-                        "prefix-length": 24
-                      }
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-6.4",
         "config": {
           "description": "QSFP28 No. 6 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-6.4"
         },
         "ethernet": {
           "config": {
@@ -636,46 +636,32 @@
           "switched-vlan": {
             "config": {
               "access-vlan": 1,
-              "interface-mode": "TRUNK",
-              "native-vlan": 1,
-              "trunk-vlans": [
-                64
-              ]
+              "interface-mode": "TRUNK"
             }
           }
+        },
+        "name": "eth-6.4",
+        "state": {
+          "admin-status": "UP"
         },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Slave port no. 4",
-                "enabled": true
+                "enabled": true,
+                "index": 0
               },
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.64",
-                        "prefix-length": 24
-                      }
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-7",
         "config": {
           "description": "QSFP28 No. 1 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-7"
         },
         "ethernet": {
           "config": {
@@ -684,26 +670,58 @@
             "port-speed": "SPEED_100GB"
           }
         },
+        "name": "eth-7",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Master port",
-                "enabled": true
-              }
+                "enabled": true,
+                "index": 0
+              },
+              "index": 0
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
+        "config": {
+          "description": "QSFP28 No. 7 port with breakout mode capability",
+          "mtu": 9412,
+          "name": "eth-7.1"
+        },
+        "ethernet": {
+          "config": {
+            "auto-negotiate": false,
+            "mac-address": "01:02:03:04:05:11",
+            "port-speed": "SPEED_10GB"
+          }
+        },
         "name": "eth-7.1",
+        "state": {
+          "admin-status": "UP"
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "config": {
+                "description": "Slave port",
+                "enabled": true,
+                "index": 0
+              },
+              "index": 0
+            }
+          ]
+        }
+      },
+      {
         "config": {
           "description": "QSFP28 No. 7 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-7.2"
         },
         "ethernet": {
           "config": {
@@ -712,26 +730,28 @@
             "port-speed": "SPEED_10GB"
           }
         },
-        "subinterfaces": {
-          "subinterface": [
-            {
-              "index": 0,
-              "config": {
-                "description": "Slave port",
-                "enabled": true
-              }
-            }
-          ]
-        },
-        "state": {
-          "admin-status": "UP"
-        }
-      },
-      {
         "name": "eth-7.2",
+        "state": {
+          "admin-status": "UP"
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "config": {
+                "description": "Slave port",
+                "enabled": true,
+                "index": 0
+              },
+              "index": 0
+            }
+          ]
+        }
+      },
+      {
         "config": {
           "description": "QSFP28 No. 7 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-7.3"
         },
         "ethernet": {
           "config": {
@@ -740,54 +760,28 @@
             "port-speed": "SPEED_10GB"
           }
         },
-        "subinterfaces": {
-          "subinterface": [
-            {
-              "index": 0,
-              "config": {
-                "description": "Slave port",
-                "enabled": true
-              }
-            }
-          ]
-        },
-        "state": {
-          "admin-status": "UP"
-        }
-      },
-      {
         "name": "eth-7.3",
-        "config": {
-          "description": "QSFP28 No. 7 port with breakout mode capability",
-          "mtu": 9412
-        },
-        "ethernet": {
-          "config": {
-            "auto-negotiate": false,
-            "mac-address": "01:02:03:04:05:11",
-            "port-speed": "SPEED_10GB"
-          }
+        "state": {
+          "admin-status": "UP"
         },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Slave port",
-                "enabled": true
-              }
+                "enabled": true,
+                "index": 0
+              },
+              "index": 0
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       },
       {
-        "name": "eth-7.4",
         "config": {
           "description": "QSFP28 No. 7 port with breakout mode capability",
-          "mtu": 9412
+          "mtu": 9412,
+          "name": "eth-7.4"
         },
         "ethernet": {
           "config": {
@@ -796,19 +790,21 @@
             "port-speed": "SPEED_10GB"
           }
         },
+        "name": "eth-7.4",
+        "state": {
+          "admin-status": "UP"
+        },
         "subinterfaces": {
           "subinterface": [
             {
-              "index": 0,
               "config": {
                 "description": "Slave port",
-                "enabled": true
-              }
+                "enabled": true,
+                "index": 0
+              },
+              "index": 0
             }
           ]
-        },
-        "state": {
-          "admin-status": "UP"
         }
       }
     ]
@@ -818,65 +814,29 @@
       "interface": [
         {
           "config": {
-            "name": "ae-1",
-            "interfval": "SLOW",
             "lacp-mode": "ACTIVE",
-            "members": {
-              "member": [
-                {
-                  "state": {
-                    "interface": "eth-2",
-                    "collecting": false,
-                    "distributing": false
-                  }
-                },
-                {
-                  "state": {
-                    "interface": "eth-3",
-                    "collecting": false,
-                    "distributing": false
-                  }
-                }
-              ]
-            },
+            "name": "ae-1",
             "system-id-mac": "01:02:03:04:11:06",
             "system-priority": 1
-          }
+          },
+          "name": "ae-1"
         },
         {
           "config": {
-            "name": "ae-2",
-            "interfval": "SLOW",
             "lacp-mode": "ACTIVE",
-            "members": {
-              "member": [
-                {
-                  "state": {
-                    "interface": "eth-4",
-                    "collecting": false,
-                    "distributing": false
-                  }
-                },
-                {
-                  "state": {
-                    "interface": "eth-5",
-                    "collecting": false,
-                    "distributing": false
-                  }
-                }
-              ]
-            },
+            "name": "ae-2",
             "system-id-mac": "01:02:03:04:12:07",
             "system-priority": 1
-          }
+          },
+          "name": "ae-2"
         }
       ]
     }
   },
   "management": {
     "transaction": {
-      "default-config-action": "TRANS_COMMIT",
-      "commit-confirm-timeout": 120
+      "commit-confirm-timeout": 120,
+      "default-config-action": "TRANS_DRY_RUN"
     }
   }
 }

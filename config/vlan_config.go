@@ -28,7 +28,9 @@ func isChangedAccessVlan(change *diff.Change) bool {
 	}
 
 	if (change.Path[cmd.VlanEthIntfPathItemIdxC] == cmd.VlanEthIntfPathItemC) && (change.Path[cmd.VlanEthEthernetPathItemIdxC] == cmd.VlanEthEthernetPathItemC) && (change.Path[cmd.VlanEthSwVlanPathItemIdxC] == cmd.VlanEthSwVlanPathItemC) && (change.Path[cmd.VlanEthAccessVlanPathItemIdxC] == cmd.VlanEthAccessVlanPathItemC) {
-		return true
+		if change.From != nil {
+			return true
+		}
 	}
 
 	return false
@@ -40,7 +42,9 @@ func isChangedNativeVlan(change *diff.Change) bool {
 	}
 
 	if (change.Path[cmd.VlanEthIntfPathItemIdxC] == cmd.VlanEthIntfPathItemC) && (change.Path[cmd.VlanEthEthernetPathItemIdxC] == cmd.VlanEthEthernetPathItemC) && (change.Path[cmd.VlanEthSwVlanPathItemIdxC] == cmd.VlanEthSwVlanPathItemC) && (change.Path[cmd.VlanEthNativeVlanPathItemIdxC] == cmd.VlanEthNativeVlanPathItemC) {
-		return true
+		if change.From != nil {
+			return true
+		}
 	}
 
 	return false
@@ -52,7 +56,9 @@ func isChangedTrunkVlan(change *diff.Change) bool {
 	}
 
 	if (change.Path[cmd.VlanEthIntfPathItemIdxC] == cmd.VlanEthIntfPathItemC) && (change.Path[cmd.VlanEthEthernetPathItemIdxC] == cmd.VlanEthEthernetPathItemC) && (change.Path[cmd.VlanEthSwVlanPathItemIdxC] == cmd.VlanEthSwVlanPathItemC) && (change.Path[cmd.VlanEthTrunkVlanPathItemIdxC] == cmd.VlanEthTrunkVlanPathItemC) {
-		return true
+		if change.From != nil {
+			return true
+		}
 	}
 
 	return false
@@ -202,13 +208,13 @@ func (this *ConfigMngrT) validateSetVlanModeEthIntfChange(changeItem *DiffChange
 		if err := this.appendCmdToTransaction(ifname, setVlanModeEthIntfCmd, setVlanModeForEthIntfC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.setVlanModeEthIntf(ifname, vlanMode); err != nil {
-			return err
-		}
-
-		changeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.setVlanModeEthIntf(ifname, vlanMode); err != nil {
+		return err
+	}
+
+	changeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -252,10 +258,10 @@ func (this *ConfigMngrT) validateSetAccessVlanEthIntfChange(changeItem *DiffChan
 		if err := this.appendCmdToTransaction(ifname, setAccessVlanEthIntfCmd, setAccessVlanForEthIntfC); err != nil {
 			return err
 		}
-
-		this.transConfigLookupTbl.setAccessVlanEthIntf(ifname, vid)
-		changeItem.MarkAsProcessed()
 	}
+
+	this.transConfigLookupTbl.setAccessVlanEthIntf(ifname, vid)
+	changeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -287,23 +293,22 @@ func (this *ConfigMngrT) validateDeleteAccessVlanEthIntfChange(changeItem *DiffC
 		if err = this.appendCmdToTransaction(ifname, deleteAccessVlanEthIntfCmd, deleteEthIntfFromAccessVlanC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.deleteAccessVlanEthIntf(ifname, vid); err != nil {
-			return err
-		}
-
-		// Update type carries info about old and new access VLAN ID. Let's create new change item
-		// in order to process new native VLAN it by SetAccessVlanEthIntfCmd
-		if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
-			var newChange diff.Change
-			copier.Copy(&newChange, changeItem.Change)
-			newChange.Type = diff.CREATE
-			newChange.From = nil
-			changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
-		}
-
-		changeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.deleteAccessVlanEthIntf(ifname, vid); err != nil {
+		return err
+	}
+
+	// Update type carries info about old and new access VLAN ID. Let's create new change item
+	// in order to process new native VLAN it by SetAccessVlanEthIntfCmd
+	if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
+		var newChange diff.Change
+		copier.Copy(&newChange, changeItem.Change)
+		newChange.Type = diff.CREATE
+		newChange.From = nil
+		changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
+	}
+	changeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -347,10 +352,10 @@ func (this *ConfigMngrT) validateSetNativeVlanEthIntfChange(changeItem *DiffChan
 		if err := this.appendCmdToTransaction(ifname, setNativeVlanEthIntfCmd, setNativeVlanForEthIntfC); err != nil {
 			return err
 		}
-
-		this.transConfigLookupTbl.setNativeVlanEthIntf(ifname, vid)
-		changeItem.MarkAsProcessed()
 	}
+
+	this.transConfigLookupTbl.setNativeVlanEthIntf(ifname, vid)
+	changeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -382,23 +387,23 @@ func (this *ConfigMngrT) validateDeleteNativeVlanEthIntfChange(changeItem *DiffC
 		if err = this.appendCmdToTransaction(ifname, deleteNativeVlanEthIntfCmd, deleteEthIntfFromNativeVlanC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.deleteNativeVlanEthIntf(ifname, vid); err != nil {
-			return err
-		}
-
-		// Update type carries info about old and new native VLAN ID. Let's create new change item
-		// in order to process new native VLAN it by SetNativeVlanEthIntfCmd
-		if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
-			var newChange diff.Change
-			copier.Copy(&newChange, changeItem.Change)
-			newChange.Type = diff.CREATE
-			newChange.From = nil
-			changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
-		}
-
-		changeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.deleteNativeVlanEthIntf(ifname, vid); err != nil {
+		return err
+	}
+
+	// Update type carries info about old and new native VLAN ID. Let's create new change item
+	// in order to process new native VLAN it by SetNativeVlanEthIntfCmd
+	if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
+		var newChange diff.Change
+		copier.Copy(&newChange, changeItem.Change)
+		newChange.Type = diff.CREATE
+		newChange.From = nil
+		changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
+	}
+
+	changeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -442,13 +447,13 @@ func (this *ConfigMngrT) validateSetTrunkVlanEthIntfChange(changeItem *DiffChang
 		if err = this.appendCmdToTransaction(ifname, setTrunkVlanEthIntfCmd, setTrunkVlanForEthIntfC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.setTrunkVlanEthIntf(ifname, vid); err != nil {
-			return err
-		}
-
-		changeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.setTrunkVlanEthIntf(ifname, vid); err != nil {
+		return err
+	}
+
+	changeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -480,25 +485,25 @@ func (this *ConfigMngrT) validateDeleteTrunkVlanEthIntfChange(changeItem *DiffCh
 		if err = this.appendCmdToTransaction(ifname, deleteTrunkVlanEthIntfCmd, deleteEthIntfFromTrunkVlanC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.deleteTrunkVlanEthIntf(ifname, vid); err != nil {
-			return err
-		}
-
-		// Update type carries info about old and new trunk VLAN ID. Let's create new change item
-		// in order to process new native VLAN it by SetTrunkVlanEthIntfCmd
-		if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
-			var newChange diff.Change
-			copier.Copy(&newChange, changeItem.Change)
-			newChange.Type = diff.CREATE
-			newChange.From = nil
-			// Let's drop "Uint16"/"String"
-			newChange.Path = newChange.Path[:len(newChange.Path)-1]
-			changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
-		}
-
-		changeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.deleteTrunkVlanEthIntf(ifname, vid); err != nil {
+		return err
+	}
+
+	// Update type carries info about old and new trunk VLAN ID. Let's create new change item
+	// in order to process new native VLAN it by SetTrunkVlanEthIntfCmd
+	if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
+		var newChange diff.Change
+		copier.Copy(&newChange, changeItem.Change)
+		newChange.Type = diff.CREATE
+		newChange.From = nil
+		// Let's drop "Uint16"/"String"
+		newChange.Path = newChange.Path[:len(newChange.Path)-1]
+		changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
+	}
+
+	changeItem.MarkAsProcessed()
 
 	return nil
 }

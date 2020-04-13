@@ -130,12 +130,12 @@ func (this *ConfigMngrT) findDeleteIpv4AddrEthSubintfPrfxLenChangeFromChangelog(
 	return nil, errors.New("Not found IPv4 address prefix length")
 }
 
-func (this *ConfigMngrT) FindSetIpv4AddrEthSubintfIp(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
+func (this *ConfigMngrT) findSetIpv4AddrEthSubintfIp(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
 	findDeleteOperation := false
 	return this.doFindIpv4AddrEthSubintfIp(changelog, findDeleteOperation)
 }
 
-func (this *ConfigMngrT) FindDeleteIpv4AddrEthSubintfIp(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
+func (this *ConfigMngrT) findDeleteIpv4AddrEthSubintfIp(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
 	findDeleteOperation := true
 	return this.doFindIpv4AddrEthSubintfIp(changelog, findDeleteOperation)
 }
@@ -227,14 +227,14 @@ func (this *ConfigMngrT) validateSetIpv4AddrEthIntf(changeItem *DiffChangeMgmtT,
 		if err = this.appendCmdToTransaction(ifname, setIpv4AddrEthIntfCmd, setIpv4AddrForEthIntfC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.addIpv4AddrEthIntf(ifname, cidr); err != nil {
-			return err
-		}
-
-		ipChangeItem.MarkAsProcessed()
-		prfxLenChangeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.addIpv4AddrEthIntf(ifname, cidr); err != nil {
+		return err
+	}
+
+	ipChangeItem.MarkAsProcessed()
+	prfxLenChangeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -280,14 +280,14 @@ func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgm
 		if err = this.appendCmdToTransaction(ifname, deleteIpv4AddrEthIntfCmd, deleteIpv4AddrFromEthIntfC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.deleteIpv4AddrEthIntf(ifname, cidr); err != nil {
-			return err
-		}
-
-		ipChangeItem.MarkAsProcessed()
-		prfxLenChangeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.deleteIpv4AddrEthIntf(ifname, cidr); err != nil {
+		return err
+	}
+
+	ipChangeItem.MarkAsProcessed()
+	prfxLenChangeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -299,7 +299,7 @@ func (this *ConfigMngrT) processSetIpv4AddrEthIntfFromChangelog(changelog *DiffC
 
 	for {
 		// Repeat till there is not any change related to delete IPv4 address from Ethernet interface
-		if change, exists := this.FindSetIpv4AddrEthSubintfIp(changelog); exists {
+		if change, exists := this.findSetIpv4AddrEthSubintfIp(changelog); exists {
 			if err := this.validateSetIpv4AddrEthIntf(change, changelog); err != nil {
 				return err
 			}
@@ -318,7 +318,7 @@ func (this *ConfigMngrT) processDeleteIpv4AddrEthIntfFromChangelog(changelog *Di
 
 	for {
 		// Repeat till there is not any change related to delete IPv4 address from Ethernet interface
-		if change, exists := this.FindDeleteIpv4AddrEthSubintfIp(changelog); exists {
+		if change, exists := this.findDeleteIpv4AddrEthSubintfIp(changelog); exists {
 			if err := this.validateDeleteIpv4AddrEthIntf(change, changelog); err != nil {
 				return err
 			}

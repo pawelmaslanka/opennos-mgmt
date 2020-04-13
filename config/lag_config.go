@@ -55,13 +55,13 @@ func (this *ConfigMngrT) validateSetLagIntfMemberChange(changeItem *DiffChangeMg
 		if err := this.appendCmdToTransaction(ifname, setLagIntfMemberCmd, setLagIntfMemberC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.setLagIntfMember(lagName, ifname); err != nil {
-			return err
-		}
-
-		changeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.setLagIntfMember(lagName, ifname); err != nil {
+		return err
+	}
+
+	changeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -87,29 +87,29 @@ func (this *ConfigMngrT) validateDeleteLagIntfMemberChange(changeItem *DiffChang
 		if err := this.appendCmdToTransaction(ifname, deleteLagIntfMemberCmd, deleteLagIntfMemberC); err != nil {
 			return err
 		}
+	}
 
-		if err := this.transConfigLookupTbl.deleteLagIntfMember(lagName, ifname); err != nil {
+	if err := this.transConfigLookupTbl.deleteLagIntfMember(lagName, ifname); err != nil {
+		return err
+	}
+
+	// Update type carries info about old and new LAG. Let's create new change item
+	// in order to process new LAG by SetLagIntfMemberCmd
+	if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
+		newLagName, err := convertInterfaceIntoString(changeItem.Change.To)
+		if err != nil {
 			return err
 		}
-
-		// Update type carries info about old and new LAG. Let's create new change item
-		// in order to process new LAG by SetLagIntfMemberCmd
-		if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
-			newLagName, err := convertInterfaceIntoString(changeItem.Change.To)
-			if err != nil {
-				return err
-			}
-			if len(newLagName) > 0 {
-				var newChange diff.Change
-				copier.Copy(&newChange, changeItem.Change)
-				newChange.Type = diff.CREATE
-				newChange.From = nil
-				changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
-			}
+		if len(newLagName) > 0 {
+			var newChange diff.Change
+			copier.Copy(&newChange, changeItem.Change)
+			newChange.Type = diff.CREATE
+			newChange.From = nil
+			changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
 		}
-
-		changeItem.MarkAsProcessed()
 	}
+
+	changeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -131,13 +131,13 @@ func (this *ConfigMngrT) validateSetLagIntfChange(changeItem *DiffChangeMgmtT, c
 		if err := this.appendCmdToTransaction(lagName, setLagIntfCmd, setLagIntfC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.setLagIntf(lagName); err != nil {
-			return err
-		}
-
-		changeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.setLagIntf(lagName); err != nil {
+		return err
+	}
+
+	changeItem.MarkAsProcessed()
 
 	return nil
 }
@@ -159,13 +159,13 @@ func (this *ConfigMngrT) validateDeleteLagIntfChange(changeItem *DiffChangeMgmtT
 		if err := this.appendCmdToTransaction(lagName, deleteLagIntfCmd, deleteLagIntfC); err != nil {
 			return err
 		}
-
-		if err := this.transConfigLookupTbl.deleteLagIntf(lagName); err != nil {
-			return err
-		}
-
-		changeItem.MarkAsProcessed()
 	}
+
+	if err := this.transConfigLookupTbl.deleteLagIntf(lagName); err != nil {
+		return err
+	}
+
+	changeItem.MarkAsProcessed()
 
 	return nil
 }

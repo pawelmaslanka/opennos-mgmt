@@ -164,9 +164,9 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChange(ch *DiffChangeMgmt
 		if err := this.appendCmdToTransaction(ifname, setPortBreakoutChanSpeedCmd, setPortBreakoutChanSpeedC); err != nil {
 			return err
 		}
-
-		ch.MarkAsProcessed()
 	}
+
+	ch.MarkAsProcessed()
 
 	return nil
 }
@@ -274,23 +274,23 @@ func (this *ConfigMngrT) validatePortBreakoutChange(changedItem *DiffChangeMgmtT
 		if err = this.appendCmdToTransaction(ifname, setPortBreakoutCmd, setPortBreakoutC); err != nil {
 			return err
 		}
+	}
 
-		if numChannels == cmd.PortBreakoutModeNoneC {
-			if err := this.transConfigLookupTbl.addNewInterfaceIfItDoesNotExist(ifname); err != nil {
+	if numChannels == cmd.PortBreakoutModeNoneC {
+		if err := this.transConfigLookupTbl.addNewInterfaceIfItDoesNotExist(ifname); err != nil {
+			return err
+		}
+	} else {
+		for i := 1; i <= 4; i++ {
+			slavePort := fmt.Sprintf("%s.%d", ifname, i)
+			if err := this.transConfigLookupTbl.addNewInterfaceIfItDoesNotExist(slavePort); err != nil {
 				return err
 			}
-		} else {
-			for i := 1; i <= 4; i++ {
-				slavePort := fmt.Sprintf("%s.%d", ifname, i)
-				if err := this.transConfigLookupTbl.addNewInterfaceIfItDoesNotExist(slavePort); err != nil {
-					return err
-				}
-			}
 		}
-
-		numChannelsChangeItem.MarkAsProcessed()
-		channelSpeedChangeItem.MarkAsProcessed()
 	}
+
+	numChannelsChangeItem.MarkAsProcessed()
+	channelSpeedChangeItem.MarkAsProcessed()
 
 	return nil
 }

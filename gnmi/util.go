@@ -138,6 +138,10 @@ func SaveConfigFile(config ygot.ValidatedGoStruct, filename string) error {
 		return status.Error(codes.Internal, msg)
 	}
 
+	// TODO: Check if exists "config-action". Add ACL for deletion of management/transaction/default-config-action
+	// Skip store "management" configuration in config file
+	// delete((jsonTree["management"].(map[string]interface{}))["transaction"].(map[string]interface{}), "config-action") // No problem if "management" isn't in the map
+	stripMgmtTransConfigAction(jsonTree)
 	jsonDump, err := json.MarshalIndent(jsonTree, "", "  ")
 	if err != nil {
 		msg := fmt.Sprintf("error in marshaling %s JSON tree to bytes: %v", jsonType, err)
@@ -154,4 +158,19 @@ func SaveConfigFile(config ygot.ValidatedGoStruct, filename string) error {
 
 	_, err = file.Write(jsonDump)
 	return err
+}
+
+func stripMgmtTransConfigAction(jsonTree map[string]interface{}) {
+	mgmt, exists := jsonTree["management"]
+	if !exists {
+		return
+	}
+	mgmtJsonTree := mgmt.(map[string]interface{})
+
+	trans, exists := mgmtJsonTree["transaction"]
+	if !exists {
+		return
+	}
+	transJsonTree := trans.(map[string]interface{})
+	delete(transJsonTree, "config-action") // No problem if "config-action" isn't in the map
 }

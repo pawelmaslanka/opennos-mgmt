@@ -966,7 +966,7 @@ func (t *configLookupTablesT) parseInterfaceAsLagMember(ifname string, eth *oc.I
 }
 
 func (t *configLookupTablesT) parseSubinterface(ifname string, subIntf *oc.Interface_Subinterface) error {
-	ipv4 := subIntf.GetIpv4Addr()
+	ipv4 := subIntf.GetIpv4()
 	if ipv4 != nil {
 		for _, addr := range ipv4.Address {
 			ip := fmt.Sprintf("%s/%d", addr.GetIp(), addr.GetPrefixLength())
@@ -976,7 +976,7 @@ func (t *configLookupTablesT) parseSubinterface(ifname string, subIntf *oc.Inter
 		}
 	}
 
-	ipv6 := subIntf.GetIpv6Addr()
+	ipv6 := subIntf.GetIpv6()
 	if ipv6 != nil {
 		for _, addr := range ipv6.Address {
 			ip := fmt.Sprintf("%s/%d", addr.GetIp(), addr.GetPrefixLength())

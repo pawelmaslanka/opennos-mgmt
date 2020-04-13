@@ -80,8 +80,13 @@ const (
 	stpBaseIdx                  = vlanBaseIdx + maxVlansC
 )
 
+const (
+	startupConfigFilenameC = "startup-config.json"
+)
+
 type cmdByIfnameT map[string]cmd.CommandI
 
+// ConfigMngrT is responisble for management of device configuration
 type ConfigMngrT struct {
 	configLookupTbl         *configLookupTablesT
 	runningConfig           ygot.ValidatedGoStruct
@@ -96,6 +101,7 @@ type ConfigMngrT struct {
 	transHasBeenStarted  bool // marks if transaction has been started
 }
 
+// NewConfigMngrT creates instance of ConfigMngrT object
 func NewConfigMngrT() *ConfigMngrT {
 	return &ConfigMngrT{
 		configLookupTbl:     newConfigLookupTables(),
@@ -252,13 +258,13 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 
 	log.Infof("Dump config model: %+v", configModel)
 	device := configModel.(*oc.Device)
-	for intfName, _ := range device.Interface {
+	for intfName := range device.Interface {
 		if err := this.configLookupTbl.addNewInterfaceIfItDoesNotExist(intfName); err != nil {
 			return err
 		}
 	}
 
-	for intfName, _ := range this.configLookupTbl.idxByEthName {
+	for intfName := range this.configLookupTbl.idxByEthName {
 		intf := device.Interface[intfName]
 		if intf == nil {
 			log.Info("Cannot find interface ", intfName)
@@ -288,7 +294,7 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 		}
 	}
 
-	for lagName, _ := range this.configLookupTbl.idxByLagName {
+	for lagName := range this.configLookupTbl.idxByLagName {
 		lag := device.Interface[lagName]
 		if lag == nil {
 			return fmt.Errorf("Failed to get LAG %s info", lagName)
@@ -345,37 +351,12 @@ func (this *ConfigMngrT) IsChangedIpv4AddrEth(change *diff.Change) bool {
 // TODO: Maybe move it into DiscardOrFinishTrans()
 func (this *ConfigMngrT) CommitCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) error {
 	// TODO: Consider if we should commit transConfigLookupTable here?
-	// var configData []byte
-	// configData, err := json.MarshalIndent(*candidateConfig, "", "  ")
-	// if err != nil {
-	// 	return err
-	// }
-
-	// log.Infof("%s", configData)
-
-	// err = oc.Unmarshal(configData, this.runningConfig)
-	// // err = json.Unmarshal(configData, &this.runningConfig)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// log.Infof("%v", this.runningConfig)
-
-	// return nil
-
-	// model := gnmi.NewModel(modeldata.ModelData,
-	// 	reflect.TypeOf((*oc.Device)(nil)),
-	// 	oc.SchemaTree["Device"],
-	// 	oc.Unmarshal,
-	// 	oc.ΛEnum)
-	// this.runningConfig, err = model.NewConfigStruct(configData)
-	// return err
-	// TODO: Make deep copy
+	// TODO: Make deep copy?
 	if err := copier.Copy(&this.runningConfig, &candidateConfig); err != nil {
 		return err
 	}
 
-	return gnmi.SaveConfigFile(this.runningConfig, "save-config.json")
+	return gnmi.SaveConfigFile(this.runningConfig, startupConfigFilenameC)
 }
 
 func (this *ConfigMngrT) GetDiffRunningConfigWithCandidateConfig(candidateConfig *ygot.ValidatedGoStruct) (diff.Changelog, error) {
@@ -394,19 +375,44 @@ func (this *ConfigMngrT) addCmdToListTrans(cmd cmd.CommandI) {
 	this.transCmdList.PushBack(cmd)
 }
 
-func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool) error {
+func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateConfig *ygot.ValidatedGoStruct) error {
+	diffChangelog := NewDiffChangelogMgmtT(changelog)
 	var err error
-	if !dryRun {
+
+	currentDefaultConfigAction := this.getCurrentTransDefaultConfigAction()
+	if change, exists := findDisallowedManagementTreeNodeDeleteOperation(diffChangelog); exists {
+		return fmt.Errorf("Delete operation on tree node %q is disallowed", change.Path)
+	}
+
+	// Stub for marking processed change
+	_, err = this.findTransDefaultConfigActionChange(diffChangelog)
+	if err != nil {
+		return err
+	}
+	configAction, err := this.findTransConfigActionChange(diffChangelog)
+	if err != nil {
+		return err
+	}
+	_, err = this.findTransCommitConfirmTimeoutChange(diffChangelog)
+	if err != nil {
+		return err
+	}
+
+	if configAction == oc.OpenconfigManagement_TRANS_TYPE_UNSET {
+		configAction = currentDefaultConfigAction
+	}
+
+	if configAction != oc.OpenconfigManagement_TRANS_TYPE_TRANS_DRY_RUN {
 		defer this.DiscardOrFinishTrans()
 		if err = this.NewTransaction(); err != nil {
 			log.Errorf("Failed to start new transaction")
 			return err
 		}
 	} else {
+		log.Infof("Dry running transaction")
 		this.transConfigLookupTbl = this.configLookupTbl.makeCopy()
 	}
 
-	diffChangelog := NewDiffChangelogMgmtT(changelog)
 	for {
 		// Deletion section
 		if err = this.processDeleteIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
@@ -475,18 +481,24 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, dryRun bool)
 		break
 	}
 
-	if !dryRun {
+	if configAction != oc.OpenconfigManagement_TRANS_TYPE_TRANS_DRY_RUN {
 		if err := this.Commit(); err != nil {
 			log.Errorf("Failed to commit changes")
 			return err
 		}
+
 		if err := this.Confirm(); err != nil {
 			log.Errorf("Failed to confirm committed changes")
 			return err
 		}
-	} else {
-		this.transConfigLookupTbl = nil
+
+		log.Infof("Save new config")
+		return this.CommitCandidateConfig(candidateConfig)
 	}
 
-	return nil
+	// Deferred DiscardOrFinishTrans() will clean transConfigLookupTbl
+	this.transConfigLookupTbl = nil
+
+	// It is not really error, we just passing information that we have finished dry running with success
+	return fmt.Errorf("Dry running: requested changes are valid")
 }
