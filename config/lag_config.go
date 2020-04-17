@@ -76,6 +76,28 @@ func (this *ConfigMngrT) validateDeleteLagIntfMemberChange(changeItem *DiffChang
 	if err != nil {
 		return err
 	}
+
+	var newChange diff.Change
+	needsCreateNewChange := (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil)
+	if needsCreateNewChange {
+		// Update type carries info about old and new LAG. Let's create new change item
+		// in order to process new LAG by SetLagIntfMemberCmd
+		newLagName, err := convertInterfaceIntoString(changeItem.Change.To)
+		if err != nil {
+			return err
+		}
+		if len(newLagName) > 0 {
+			copier.Copy(&newChange, changeItem.Change)
+			newChange.Type = diff.CREATE
+			newChange.From = nil
+			// Update current change
+			changeItem.Change.Type = diff.DELETE
+			changeItem.Change.To = nil
+		} else {
+			needsCreateNewChange = false
+		}
+	}
+
 	log.Infof("Requested remove Ethernet interface %s from LAG member %s", ifname, lagName)
 	deleteLagIntfMemberCmd := cmd.NewDeleteLagIntfMemberCmdT(changeItem.Change, this.ethSwitchMgmtClient)
 	if err := this.transConfigLookupTbl.checkDependenciesForDeleteLagIntfMember(lagName, ifname); err != nil {
@@ -93,20 +115,8 @@ func (this *ConfigMngrT) validateDeleteLagIntfMemberChange(changeItem *DiffChang
 		return err
 	}
 
-	// Update type carries info about old and new LAG. Let's create new change item
-	// in order to process new LAG by SetLagIntfMemberCmd
-	if (changeItem.Change.Type == diff.UPDATE) && (changeItem.Change.To != nil) {
-		newLagName, err := convertInterfaceIntoString(changeItem.Change.To)
-		if err != nil {
-			return err
-		}
-		if len(newLagName) > 0 {
-			var newChange diff.Change
-			copier.Copy(&newChange, changeItem.Change)
-			newChange.Type = diff.CREATE
-			newChange.From = nil
-			changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
-		}
+	if needsCreateNewChange {
+		changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
 	}
 
 	changeItem.MarkAsProcessed()
@@ -189,7 +199,7 @@ func findSetLagIntfMemberChange(changelog *DiffChangelogMgmtT) (change *DiffChan
 func findDeleteLagIntfMemberChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
 	for _, ch := range changelog.Changes {
 		if !ch.IsProcessed() {
-			if ch.Change.Type == diff.UPDATE {
+			if ch.Change.Type != diff.CREATE {
 				if isChangedLagIntfMember(ch.Change) {
 					if ch.Change.From != nil {
 						return ch, true
@@ -205,7 +215,7 @@ func findDeleteLagIntfMemberChange(changelog *DiffChangelogMgmtT) (change *DiffC
 func findSetLagIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
 	for _, ch := range changelog.Changes {
 		if !ch.IsProcessed() {
-			if ch.Change.Type == diff.CREATE {
+			if ch.Change.Type != diff.DELETE {
 				if isChangedLagIntf(ch.Change) {
 					if ch.Change.To != nil {
 						return ch, true
@@ -221,7 +231,7 @@ func findSetLagIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmt
 func findDeleteLagIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
 	for _, ch := range changelog.Changes {
 		if !ch.IsProcessed() {
-			if ch.Change.Type == diff.DELETE {
+			if ch.Change.Type != diff.CREATE {
 				if isChangedLagIntf(ch.Change) {
 					if ch.Change.From != nil {
 						return ch, true

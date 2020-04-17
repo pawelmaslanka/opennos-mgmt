@@ -5,6 +5,7 @@ import (
 	"fmt"
 	lib "golibext"
 	cmd "opennos-mgmt/config/command"
+	"opennos-mgmt/utils"
 
 	log "github.com/golang/glog"
 	"github.com/r3labs/diff"
@@ -77,7 +78,7 @@ func (this *ConfigMngrT) findSetIpv4AddrEthSubintfIpChangeFromChangelog(ifname s
 
 func (this *ConfigMngrT) findDeleteIpv4AddrEthSubintfIpChangeFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, error) {
 	for _, ch := range changelog.Changes {
-		if ch.Change.Type == diff.DELETE {
+		if ch.Change.Type != diff.CREATE {
 			if this.IsChangedIpv4AddrEthSubintfIp(ch.Change) {
 				log.Infof("Found change IPv4 address request too:\n%+v", ch.Change)
 				if ch.Change.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] == ifname {
@@ -117,7 +118,7 @@ func (this *ConfigMngrT) findSetIpv4AddrEthSubintfPrfxLenChangeFromChangelog(ifn
 
 func (this *ConfigMngrT) findDeleteIpv4AddrEthSubintfPrfxLenChangeFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, error) {
 	for _, ch := range changelog.Changes {
-		if ch.Change.Type == diff.DELETE {
+		if ch.Change.Type != diff.CREATE {
 			if this.IsChangedIpv4AddrEthSubintfPrfxLen(ch.Change) {
 				log.Infof("Found changing IPv4 prefix len request too:\n%+v", ch.Change)
 				if ch.Change.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] == ifname {
@@ -215,7 +216,17 @@ func (this *ConfigMngrT) validateSetIpv4AddrEthIntf(changeItem *DiffChangeMgmtT,
 		return errors.New("Unexpected UPDATE request for change IPv4 address")
 	}
 
-	cidr := fmt.Sprintf("%s/%d", *ipChangeItem.Change.To.(*string), *prfxLenChangeItem.Change.To.(*uint8))
+	ip, err := utils.ConvertGoInterfaceIntoString(ipChangeItem.Change.To)
+	if err != nil {
+		return err
+	}
+
+	prfxLen, err := utils.ConvertGoInterfaceIntoUint8(prfxLenChangeItem.Change.To)
+	if err != nil {
+		return err
+	}
+
+	cidr := fmt.Sprintf("%s/%d", ip, prfxLen)
 	log.Infof("Requested set IPv4 address %s for Ethernet interface %s", cidr, ifname)
 	setIpv4AddrEthIntfCmd := cmd.NewSetIpv4AddrEthIntfCmdT(ipChangeItem.Change, prfxLenChangeItem.Change, this.ethSwitchMgmtClient)
 	if err := this.transConfigLookupTbl.checkDependenciesForSetIpv4AddrForEthIntf(ifname, cidr); err != nil {

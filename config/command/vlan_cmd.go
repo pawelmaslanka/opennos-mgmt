@@ -1,7 +1,12 @@
 package command
 
 import (
+	"context"
 	mgmt "opennos-eth-switch-service/mgmt"
+	"opennos-eth-switch-service/mgmt/interfaces"
+	"opennos-eth-switch-service/mgmt/vlan"
+	"opennos-mgmt/utils"
+	"time"
 
 	"github.com/r3labs/diff"
 )
@@ -81,26 +86,8 @@ func (this *commandT) doSetVlanModeCmd(shouldBeAbleOnlyToUndo bool) error {
 	}
 
 	this.dumpInternalData()
-	// numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
-	// if err != nil {
-	// 	return err
-	// }
 
-	// channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	// defer cancel()
-	// _, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
-	// 	Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
-	// 	NumChannels:  numChannels,
-	// 	ChannelSpeed: &channelSpeed,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+	// TODO: Not implemented yet
 
 	this.finalize()
 	return nil
@@ -111,7 +98,7 @@ type SetAccessVlanEthIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
 }
 
-// NewSetNativeVlanEthIntfCmdT creates new instance of SetAccessVlanEthIntfCmdT type
+// NewSetAccessVlanEthIntfCmdT creates new instance of SetAccessVlanEthIntfCmdT type
 func NewSetAccessVlanEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetAccessVlanEthIntfCmdT {
 	changes := make([]*diff.Change, maxChangeVlanIdxC)
 	changes[vlanChangeIdxC] = vlan
@@ -123,14 +110,16 @@ func NewSetAccessVlanEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitc
 // Execute implements the same method from CommandI interface and set access VLAN for Ethernet interface
 func (this *SetAccessVlanEthIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doSetAccessVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_ACCESS, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *SetAccessVlanEthIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doSetAccessVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_ACCESS, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -144,43 +133,12 @@ func (this *SetAccessVlanEthIntfCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
-func (this *commandT) doSetAccessVlanCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
-	}
-
-	this.dumpInternalData()
-	// numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	// defer cancel()
-	// _, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
-	// 	Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
-	// 	NumChannels:  numChannels,
-	// 	ChannelSpeed: &channelSpeed,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
-	this.finalize()
-	return nil
-}
-
 // DeleteAccessVlanEthIntfCmdT implements command for delete access VLAN from Ethernet Interface
 type DeleteAccessVlanEthIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
 }
 
-// NewDeleteNativeVlanEthIntfCmdT creates new instance of DeleteAccessVlanEthIntfCmdT type
+// NewDeleteAccessVlanEthIntfCmdT creates new instance of DeleteAccessVlanEthIntfCmdT type
 func NewDeleteAccessVlanEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *DeleteAccessVlanEthIntfCmdT {
 	changes := make([]*diff.Change, maxChangeVlanIdxC)
 	changes[vlanChangeIdxC] = vlan
@@ -192,14 +150,16 @@ func NewDeleteAccessVlanEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSw
 // Execute implements the same method from CommandI interface and deletes access VLAN from Ethernet interface
 func (this *DeleteAccessVlanEthIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doDeleteAccessVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_ACCESS, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *DeleteAccessVlanEthIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doDeleteAccessVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_ACCESS, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -211,37 +171,6 @@ func (this *DeleteAccessVlanEthIntfCmdT) GetName() string {
 func (this *DeleteAccessVlanEthIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*DeleteAccessVlanEthIntfCmdT)
 	return this.equals(otherCmd.commandT)
-}
-
-func (this *commandT) doDeleteAccessVlanCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
-	}
-
-	this.dumpInternalData()
-	// numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	// defer cancel()
-	// _, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
-	// 	Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
-	// 	NumChannels:  numChannels,
-	// 	ChannelSpeed: &channelSpeed,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
-	this.finalize()
-	return nil
 }
 
 // SetNativeVlanEthIntfCmdT implements command for set native VLAN for Ethernet Interface
@@ -261,14 +190,16 @@ func NewSetNativeVlanEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitc
 // Execute implements the same method from CommandI interface and deletes native VLAN from Ethernet interface
 func (this *SetNativeVlanEthIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doSetNativeVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_NATIVE, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *SetNativeVlanEthIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doSetNativeVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_NATIVE, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -280,37 +211,6 @@ func (this *SetNativeVlanEthIntfCmdT) GetName() string {
 func (this *SetNativeVlanEthIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*SetNativeVlanEthIntfCmdT)
 	return this.equals(otherCmd.commandT)
-}
-
-func (this *commandT) doSetNativeVlanCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
-	}
-
-	this.dumpInternalData()
-	// numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	// defer cancel()
-	// _, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
-	// 	Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
-	// 	NumChannels:  numChannels,
-	// 	ChannelSpeed: &channelSpeed,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
-	this.finalize()
-	return nil
 }
 
 // DeleteNativeVlanEthIntfCmdT implements command for delete native VLAN from Ethernet Interface
@@ -330,14 +230,16 @@ func NewDeleteNativeVlanEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSw
 // Execute implements the same method from CommandI interface and deletes native VLAN from Ethernet interface
 func (this *DeleteNativeVlanEthIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doDeleteNativeVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_NATIVE, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *DeleteNativeVlanEthIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doDeleteNativeVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_NATIVE, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -349,37 +251,6 @@ func (this *DeleteNativeVlanEthIntfCmdT) GetName() string {
 func (this *DeleteNativeVlanEthIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*DeleteNativeVlanEthIntfCmdT)
 	return this.equals(otherCmd.commandT)
-}
-
-func (this *commandT) doDeleteNativeVlanCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
-	}
-
-	this.dumpInternalData()
-	// numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	// defer cancel()
-	// _, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
-	// 	Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
-	// 	NumChannels:  numChannels,
-	// 	ChannelSpeed: &channelSpeed,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
-	this.finalize()
-	return nil
 }
 
 // SetTrunkVlanEthIntfCmdT implements command for set trunk VLAN from Ethernet Interface
@@ -399,14 +270,16 @@ func NewSetTrunkVlanEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitch
 // Execute implements the same method from CommandI interface and set trunk VLAN for Ethernet interface
 func (this *SetTrunkVlanEthIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doSetTrunkVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_TRUNK, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *SetTrunkVlanEthIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doSetTrunkVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_TRUNK, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -418,37 +291,6 @@ func (this *SetTrunkVlanEthIntfCmdT) GetName() string {
 func (this *SetTrunkVlanEthIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*SetTrunkVlanEthIntfCmdT)
 	return this.equals(otherCmd.commandT)
-}
-
-func (this *commandT) doSetTrunkVlanCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
-	}
-
-	this.dumpInternalData()
-	// numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
-	// if err != nil {
-	// 	return err
-	// }
-
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	// defer cancel()
-	// _, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
-	// 	Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
-	// 	NumChannels:  numChannels,
-	// 	ChannelSpeed: &channelSpeed,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
-
-	this.finalize()
-	return nil
 }
 
 // DeleteTrunkVlanEthIntfCmdT implements command for delete trunk VLAN from Ethernet Interface
@@ -468,14 +310,16 @@ func NewDeleteTrunkVlanEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwi
 // Execute implements the same method from CommandI interface and deletes trunk VLAN from Ethernet interface
 func (this *DeleteTrunkVlanEthIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doDeleteTrunkVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_TRUNK, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *DeleteTrunkVlanEthIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doDeleteTrunkVlanCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doVlanEthIntfCmd(this.commandT, vlan.Vlan_TRUNK, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -489,33 +333,54 @@ func (this *DeleteTrunkVlanEthIntfCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
-func (this *commandT) doDeleteTrunkVlanCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
+func doVlanEthIntfCmd(cmd *commandT, mode vlan.Vlan_Mode, isDelete bool, shouldBeAbleOnlyToUndo bool) error {
+	if cmd.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return cmd.createErrorAccordingToExecutionState()
 	}
 
-	this.dumpInternalData()
-	// numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
-	// if err != nil {
-	// 	return err
-	// }
+	cmd.dumpInternalData()
 
-	// channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
-	// if err != nil {
-	// 	return err
-	// }
+	var err error
+	var vid uint16
+	if isDelete {
+		vid, err = utils.ConvertGoInterfaceIntoUint16(cmd.changes[0].From)
+	} else {
+		vid, err = utils.ConvertGoInterfaceIntoUint16(cmd.changes[0].To)
+	}
+	if err != nil {
+		return nil
+	}
 
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	// defer cancel()
-	// _, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
-	// 	Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
-	// 	NumChannels:  numChannels,
-	// 	ChannelSpeed: &channelSpeed,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+	ethIntfs := make([]*interfaces.EthernetIntf, len(cmd.changes))
+	for i, change := range cmd.changes {
+		ethIntfs[i] = &interfaces.EthernetIntf{
+			Ifname: change.Path[VlanEthIfnamePathItemIdxC],
+		}
+	}
 
-	this.finalize()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if isDelete {
+		_, err = (*cmd.ethSwitchMgmt).RemoveEthernetIntfFromVlan(ctx, &vlan.RemoveEthernetIntfFromVlanRequest{
+			Vlan: &vlan.Vlan{
+				Vid:  uint32(vid),
+				Mode: mode,
+			},
+			EthIntfs: ethIntfs,
+		})
+	} else {
+		_, err = (*cmd.ethSwitchMgmt).AddEthernetIntfToVlan(ctx, &vlan.AddEthernetIntfToVlanRequest{
+			Vlan: &vlan.Vlan{
+				Vid:  uint32(vid),
+				Mode: mode,
+			},
+			EthIntfs: ethIntfs,
+		})
+	}
+	if err != nil {
+		return err
+	}
+
+	cmd.finalize()
 	return nil
 }

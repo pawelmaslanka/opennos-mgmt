@@ -1,7 +1,11 @@
 package command
 
 import (
+	"context"
 	mgmt "opennos-eth-switch-service/mgmt"
+	"opennos-eth-switch-service/mgmt/interfaces"
+	"opennos-mgmt/utils"
+	"time"
 
 	"github.com/r3labs/diff"
 )
@@ -43,14 +47,16 @@ func NewSetLagIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClien
 // Execute implements the same method from CommandI interface and creates LAG interface
 func (this *SetLagIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doSetLagIntfCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doLagIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *SetLagIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doSetLagIntfCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doLagIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -62,18 +68,6 @@ func (this *SetLagIntfCmdT) GetName() string {
 func (this *SetLagIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*SetLagIntfCmdT)
 	return this.equals(otherCmd.commandT)
-}
-
-func (this *commandT) doSetLagIntfCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
-	}
-
-	this.dumpInternalData()
-	// TODO: Make implementations
-
-	this.finalize()
-	return nil
 }
 
 // DeleteLagIntfCmdT implements command for deletion of LAG interface
@@ -93,14 +87,16 @@ func NewDeleteLagIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtCl
 // Execute implements the same method from CommandI interface and deletes LAG interface
 func (this *DeleteLagIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doDeleteLagIntfCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doLagIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *DeleteLagIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doDeleteLagIntfCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doLagIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -112,18 +108,6 @@ func (this *DeleteLagIntfCmdT) GetName() string {
 func (this *DeleteLagIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*DeleteLagIntfCmdT)
 	return this.equals(otherCmd.commandT)
-}
-
-func (this *commandT) doDeleteLagIntfCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
-	}
-
-	this.dumpInternalData()
-	// TODO: Make implementations
-
-	this.finalize()
-	return nil
 }
 
 // SetLagIntfMemberCmdT implements command for add Ethernet interface to LAG
@@ -143,14 +127,16 @@ func NewSetLagIntfMemberCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgm
 // Execute implements the same method from CommandI interface and adds Ethernet interface to LAG
 func (this *SetLagIntfMemberCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doSetLagIntfMemberCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doLagIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *SetLagIntfMemberCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doSetLagIntfMemberCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doLagIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -162,18 +148,6 @@ func (this *SetLagIntfMemberCmdT) GetName() string {
 func (this *SetLagIntfMemberCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*SetLagIntfMemberCmdT)
 	return this.equals(otherCmd.commandT)
-}
-
-func (this *commandT) doSetLagIntfMemberCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
-	}
-
-	this.dumpInternalData()
-	// TODO: Make implementations
-
-	this.finalize()
-	return nil
 }
 
 // DeleteLagIntfMemberCmdT implements command for remove Ethernet interface from LAG
@@ -193,14 +167,16 @@ func NewDeleteLagIntfMemberCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitch
 // Execute implements the same method from CommandI interface and removes Ethernet interface from LAG
 func (this *DeleteLagIntfMemberCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.doDeleteLagIntfMemberCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doLagIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *DeleteLagIntfMemberCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.doDeleteLagIntfMemberCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doLagIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -214,14 +190,93 @@ func (this *DeleteLagIntfMemberCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
-func (this *commandT) doDeleteLagIntfMemberCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
+func doLagIntfCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) error {
+	if cmd.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return cmd.createErrorAccordingToExecutionState()
 	}
 
-	this.dumpInternalData()
-	// TODO: Make implementations
+	cmd.dumpInternalData()
 
-	this.finalize()
+	var err error
+	var ifname string
+	if isDelete {
+		ifname, err = utils.ConvertGoInterfaceIntoString(cmd.changes[0].From)
+	} else {
+		ifname, err = utils.ConvertGoInterfaceIntoString(cmd.changes[0].To)
+	}
+	if err != nil {
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if isDelete {
+		_, err = (*cmd.ethSwitchMgmt).DeleteAggregateIntf(ctx, &interfaces.DeleteAggregateIntfRequest{
+			AggIntf: &interfaces.AggregateIntf{
+				Ifname: ifname,
+			},
+		})
+	} else {
+		_, err = (*cmd.ethSwitchMgmt).CreateAggregateIntf(ctx, &interfaces.CreateAggregateIntfRequest{
+			AggIntf: &interfaces.AggregateIntf{
+				Ifname: ifname,
+			},
+		})
+	}
+	if err != nil {
+		return err
+	}
+
+	cmd.finalize()
+	return nil
+}
+
+func doLagIntfMemberCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) error {
+	if cmd.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return cmd.createErrorAccordingToExecutionState()
+	}
+
+	cmd.dumpInternalData()
+
+	var err error
+	var ifname string
+	if isDelete {
+		ifname, err = utils.ConvertGoInterfaceIntoString(cmd.changes[0].From)
+	} else {
+		ifname, err = utils.ConvertGoInterfaceIntoString(cmd.changes[0].To)
+	}
+	if err != nil {
+		return nil
+	}
+
+	ethIntfs := make([]*interfaces.EthernetIntf, len(cmd.changes))
+	for i, change := range cmd.changes {
+		ethIntfs[i] = &interfaces.EthernetIntf{
+			Ifname: change.Path[LagIntfIfnamePathItemIdxC],
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if isDelete {
+		_, err = (*cmd.ethSwitchMgmt).RemoveEthernetIntfFromAggregateIntf(ctx, &interfaces.RemoveEthernetIntfFromAggregateIntfRequest{
+			AggIntf: &interfaces.AggregateIntf{
+				Ifname: ifname,
+			},
+			EthIntfs: ethIntfs,
+		})
+	} else {
+		_, err = (*cmd.ethSwitchMgmt).AddEthernetIntfToAggregateIntf(ctx, &interfaces.AddEthernetIntfToAggregateIntfRequest{
+			AggIntf: &interfaces.AggregateIntf{
+				Ifname: ifname,
+			},
+			EthIntfs: ethIntfs,
+		})
+	}
+	if err != nil {
+		return err
+	}
+
+	cmd.finalize()
 	return nil
 }

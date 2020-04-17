@@ -1,7 +1,11 @@
 package command
 
 import (
+	"context"
 	mgmt "opennos-eth-switch-service/mgmt"
+	"opennos-eth-switch-service/mgmt/interfaces"
+	"opennos-mgmt/utils"
+	"time"
 
 	"github.com/r3labs/diff"
 )
@@ -50,14 +54,16 @@ func NewSetIpv4AddrEthIntfCmdT(ip *diff.Change, prfxLen *diff.Change, ethSwitchM
 // Execute implements the same method from CommandI interface and assigns IPv4 address for Ethernet interface
 func (this *SetIpv4AddrEthIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.configureIpv4AddrCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doIpv4AddrCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *SetIpv4AddrEthIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.configureIpv4AddrCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doIpv4AddrCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -89,14 +95,16 @@ func NewDeleteIpv4AddrEthIntfCmdT(ip *diff.Change, prfxLen *diff.Change, ethSwit
 // Execute implements the same method from CommandI interface and deletes IPv4 address from Ethernet interface
 func (this *DeleteIpv4AddrEthIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
-	return this.configureIpv4AddrCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := true
+	return doIpv4AddrCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
 func (this *DeleteIpv4AddrEthIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
-	return this.configureIpv4AddrCmd(shouldBeAbleOnlyToUndo)
+	isGoingToBeDeleted := false
+	return doIpv4AddrCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
@@ -110,33 +118,54 @@ func (this *DeleteIpv4AddrEthIntfCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
-func (this *commandT) configureIpv4AddrCmd(shouldBeAbleOnlyToUndo bool) error {
-	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
-		return this.createErrorAccordingToExecutionState()
+func doIpv4AddrCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) error {
+	if cmd.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return cmd.createErrorAccordingToExecutionState()
 	}
 
-	this.dumpInternalData()
-	// numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
-	// if err != nil {
-	// 	return err
-	// }
+	cmd.dumpInternalData()
 
-	// channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
-	// if err != nil {
-	// 	return err
-	// }
+	var err error
+	var ip string
+	var prfxLen uint8
+	if isDelete {
+		ip, err = utils.ConvertGoInterfaceIntoString(cmd.changes[ipv4AddrIpChangeIdxC].From)
+		prfxLen, err = utils.ConvertGoInterfaceIntoUint8(cmd.changes[ipv4AddrPrfxLenChangeIdxC].From)
+	} else {
+		ip, err = utils.ConvertGoInterfaceIntoString(cmd.changes[ipv4AddrIpChangeIdxC].To)
+		prfxLen, err = utils.ConvertGoInterfaceIntoUint8(cmd.changes[ipv4AddrPrfxLenChangeIdxC].To)
+	}
+	if err != nil {
+		return nil
+	}
 
-	// ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	// defer cancel()
-	// _, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
-	// 	Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
-	// 	NumChannels:  numChannels,
-	// 	ChannelSpeed: &channelSpeed,
-	// })
-	// if err != nil {
-	// 	return err
-	// }
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if isDelete {
+		_, err = (*cmd.ethSwitchMgmt).RemoveIpv4AddrFromEthernetIntfRequest(ctx, &interfaces.RemoveIpv4AddrFromEthernetIntfRequest{
+			EthIntf: &interfaces.EthernetIntf{
+				Ifname: cmd.changes[0].Path[Ipv4AddrEthIfnamePathItemIdxC],
+			},
+			Addr: &interfaces.Ipv4Addr{
+				Ip:      ip,
+				PrfxLen: uint32(prfxLen),
+			},
+		})
+	} else {
+		_, err = (*cmd.ethSwitchMgmt).AddIpv4AddrToEthernetIntf(ctx, &interfaces.AddIpv4AddrToEthernetIntfRequest{
+			EthIntf: &interfaces.EthernetIntf{
+				Ifname: cmd.changes[0].Path[Ipv4AddrEthIfnamePathItemIdxC],
+			},
+			Addr: &interfaces.Ipv4Addr{
+				Ip:      ip,
+				PrfxLen: uint32(prfxLen),
+			},
+		})
+	}
+	if err != nil {
+		return err
+	}
 
-	this.finalize()
+	cmd.finalize()
 	return nil
 }

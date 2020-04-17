@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	mgmt "opennos-eth-switch-service/mgmt"
+	"opennos-eth-switch-service/mgmt/interfaces"
 	"opennos-eth-switch-service/mgmt/platform"
 	"opennos-mgmt/gnmi/modeldata/oc"
 	"time"
@@ -142,7 +143,9 @@ func (this *commandT) configurePortBreakout(shouldBeAbleOnlyToUndo bool) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	_, err = (*this.ethSwitchMgmt).SetPortBreakout(ctx, &platform.PortBreakoutRequest{
-		Ifname:       this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
+		EthIntf: &interfaces.EthernetIntf{
+			Ifname: this.changes[numChannelsChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
+		},
 		NumChannels:  numChannels,
 		ChannelSpeed: &channelSpeed,
 	})
@@ -168,7 +171,9 @@ func (this *commandT) doPortBreakoutChanSpeedCmd(shouldBeAbleOnlyToUndo bool) er
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	_, err = (*this.ethSwitchMgmt).SetPortBreakoutChanSpeed(ctx, &mgmt.PortBreakoutChanSpeedRequest{
-		Ifname:       this.changes[channelSpeedChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
+		EthIntf: &interfaces.EthernetIntf{
+			Ifname: this.changes[channelSpeedChangeIdxC].Path[PortBreakoutIfnamePathItemIdxC],
+		},
 		ChannelSpeed: &channelSpeed,
 	})
 	if err != nil {
