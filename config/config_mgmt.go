@@ -2,11 +2,14 @@ package config
 
 import (
 	"container/list"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"opennos-mgmt/gnmi"
 	"opennos-mgmt/gnmi/modeldata/oc"
+	"strings"
+	"time"
 
 	cmd "opennos-mgmt/config/command"
 
@@ -97,9 +100,12 @@ type ConfigMngrT struct {
 	// transactions    [TransactionIdx][maxNumberOfActionsInTransactionC]cmdByIfnameT
 	// transConfigLookupTbl every queued command should remove dependency from here
 	// e.g. when LAG is going to be remove, we should remove ports from this LAG, and LAG itself
-	transConfigLookupTbl *configLookupTablesT
-	transCmdList         *list.List
-	transHasBeenStarted  bool // marks if transaction has been started
+	transConfigLookupTbl             *configLookupTablesT
+	transCmdList                     *list.List
+	transConfirmationTimeoutCtx      context.Context
+	transConfirmationCancel          context.CancelFunc
+	transConfirmationCandidateConfig *ygot.ValidatedGoStruct
+	transHasBeenStarted              bool // marks if transaction has been started
 }
 
 // NewConfigMngrT creates instance of ConfigMngrT object
@@ -111,7 +117,7 @@ func NewConfigMngrT() *ConfigMngrT {
 }
 
 func (this *ConfigMngrT) NewTransaction() error {
-	if this.transHasBeenStarted {
+	if this.isTransPending() {
 		return errors.New("Transaction is already active")
 	}
 	conn, err := grpc.Dial(fmt.Sprintf(":%d", serv_param.MgmtListeningTcpPortC), grpc.WithInsecure(), grpc.WithBlock())
@@ -136,32 +142,9 @@ func (this *ConfigMngrT) NewTransaction() error {
 	return nil
 }
 
-func (this *ConfigMngrT) CommitBackup() error {
-	if !this.transHasBeenStarted {
-		return errors.New("Transaction not has been started")
-	}
-
-	var i OrdinalNumberT
-	for i = 0; i < maxNumberOfActionsInTransactionC; i++ {
-		for _, command := range this.cmdByIfname[i] {
-			log.Infof("Execute command %q", command.GetName())
-			if err := command.Execute(); err != nil {
-				for i > 0 {
-					i--
-					command.Undo()
-				}
-				this.DiscardOrFinishTrans()
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 func (this *ConfigMngrT) Commit() error {
-	if !this.transHasBeenStarted {
-		return errors.New("Transaction not has been started")
+	if !this.isTransPending() {
+		return errors.New("Transaction has not been started")
 	}
 
 	for ex := this.transCmdList.Front(); ex != nil; ex = ex.Next() {
@@ -180,49 +163,27 @@ func (this *ConfigMngrT) Commit() error {
 	return nil
 }
 
-func (this *ConfigMngrT) RollbackBackup() error {
-	if !this.transHasBeenStarted {
-		return errors.New("Transaction not has been started")
-	}
-
-	i := maxNumberOfActionsInTransactionC
-	for i > 0 {
-		i--
-		for _, command := range this.cmdByIfname[i] {
-			if err := command.Undo(); err != nil {
-				for i < maxNumberOfActionsInTransactionC {
-					i++
-					command.Execute()
-				}
-				return err
-			}
-		}
-	}
-
-	this.DiscardOrFinishTrans()
-	return nil
-}
-
 func (this *ConfigMngrT) Rollback() error {
-	if !this.transHasBeenStarted {
-		return errors.New("Transaction not has been started")
+	if !this.isTransPending() {
+		return errors.New("Transaction has not been started")
 	}
 
+	var err error = nil
 	for un := this.transCmdList.Back(); un != nil; un = un.Prev() {
 		undoCmd := un.Value.(cmd.CommandI)
 		log.Infof("Undo command %q", undoCmd.GetName())
-		if err := undoCmd.Undo(); err != nil {
+		if err = undoCmd.Undo(); err != nil {
 			for ex := un.Next(); ex != nil; ex = ex.Next() {
 				execCmd := ex.Value.(cmd.CommandI)
 				execCmd.Execute()
 			}
-			this.DiscardOrFinishTrans()
-			return err
+
+			break
 		}
 	}
 
 	this.DiscardOrFinishTrans()
-	return nil
+	return err
 }
 
 func (this *ConfigMngrT) CommitConfirm() error {
@@ -231,23 +192,26 @@ func (this *ConfigMngrT) CommitConfirm() error {
 
 func (this *ConfigMngrT) Confirm() error {
 	if !this.transHasBeenStarted {
-		return errors.New("Transaction not has been started")
+		return errors.New("Transaction has not been started")
 	}
 
 	this.configLookupTbl = this.transConfigLookupTbl.makeCopy()
-
 	this.DiscardOrFinishTrans()
-	return nil
+	return this.CommitCandidateConfig(this.transConfirmationCandidateConfig)
 }
 
 func (this *ConfigMngrT) DiscardOrFinishTrans() error {
-	if !this.transHasBeenStarted {
-		return errors.New("Transaction not has been started")
+	if !this.isTransPending() {
+		return errors.New("Transaction has not been started")
 	}
 	this.ethSwitchMgmtClientConn.Close()
 	this.ethSwitchMgmtClient = nil
 	this.transConfigLookupTbl = nil
 	this.transCmdList.Init()
+	// Check context before clean all related data
+	this.transConfirmationTimeoutCtx = nil
+	this.transConfirmationCancel = nil
+	this.transConfirmationCandidateConfig = nil
 	this.transHasBeenStarted = false
 	return nil
 }
@@ -261,12 +225,40 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 	log.Infof("Dump config model: %+v", configModel)
 	device := configModel.(*oc.Device)
 	for ethIfname := range device.Interface {
+		if strings.ContainsAny(ethIfname, ".") {
+			var masterPort, slavePort int
+			if n, err := fmt.Sscanf(ethIfname, "eth-%d.%d", &masterPort, &slavePort); n < 1 {
+				return fmt.Errorf("1. Failed to break out Ethernet interface %s into master and slave port: %s",
+					ethIfname, err)
+			}
+
+			port := fmt.Sprintf("eth-%d", masterPort)
+			if !isPortSplitted(device, port) {
+				log.Infof("1. Port %s is not splitted", port)
+				continue
+			}
+		}
+
 		if err := this.configLookupTbl.addNewInterfaceIfItDoesNotExist(ethIfname); err != nil {
 			return err
 		}
 	}
 
 	for ethIfname := range this.configLookupTbl.idxByEthIfname {
+		if strings.ContainsAny(ethIfname, ".") {
+			var masterPort, slavePort int
+			if n, err := fmt.Sscanf(ethIfname, "eth-%d.%d", &masterPort, &slavePort); n < 1 {
+				return fmt.Errorf("2. Failed to break out Ethernet interface %s into master and slave port: %s",
+					ethIfname, err)
+			}
+
+			port := fmt.Sprintf("eth-%d", masterPort)
+			if !isPortSplitted(device, port) {
+				log.Infof("2. Port %s is not splitted", port)
+				continue
+			}
+		}
+
 		intf := device.Interface[ethIfname]
 		if intf == nil {
 			log.Info("Cannot find interface ", ethIfname)
@@ -361,6 +353,39 @@ func (this *ConfigMngrT) configureDevice(configModel *ygot.ValidatedGoStruct) er
 	return this.DiscardOrFinishTrans()
 }
 
+func isPortSplitted(device *oc.Device, ethIfname string) bool {
+	// We want to process only not splitted ports
+	if strings.ContainsAny(ethIfname, ".") {
+		return false
+	}
+
+	comp := device.GetComponent(ethIfname)
+	if comp == nil {
+		return false
+	}
+
+	port := comp.GetPort()
+	if port == nil {
+		return false
+	}
+
+	mode := port.GetBreakoutMode()
+	if mode == nil {
+		return false
+	}
+
+	numChannels := mode.GetNumChannels()
+	if numChannels == uint8(cmd.PortBreakoutModeInvalidC) {
+		return false
+	}
+
+	if numChannels != uint8(cmd.PortBreakoutModeNoneC) {
+		return true
+	}
+
+	return false
+}
+
 func (this *ConfigMngrT) appendCmdToTransaction(ifname string, cmdAdd cmd.CommandI, idx OrdinalNumberT) error {
 	cmds := this.cmdByIfname[idx]
 	for _, command := range cmds {
@@ -374,18 +399,6 @@ func (this *ConfigMngrT) appendCmdToTransaction(ifname string, cmdAdd cmd.Comman
 	cmds[ifname] = cmdAdd
 	this.addCmdToListTrans(cmdAdd)
 	return nil
-}
-
-func (this *ConfigMngrT) IsChangedIpv4AddrEth(change *diff.Change) bool {
-	if len(change.Path) < cmd.Ipv4AddrEthPathItemsCountC {
-		return false
-	}
-
-	if (change.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] != cmd.Ipv4AddrEthIntfPathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfPathItemIdxC] != cmd.Ipv4AddrEthSubintfPathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4PathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4PathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPathItemC) || ((change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemC) && (change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemC)) {
-		return false
-	}
-
-	return true
 }
 
 // TODO: Maybe move it into DiscardOrFinishTrans()
@@ -415,6 +428,10 @@ func (this *ConfigMngrT) addCmdToListTrans(cmd cmd.CommandI) {
 	this.transCmdList.PushBack(cmd)
 }
 
+func (this *ConfigMngrT) isTransPending() bool {
+	return this.transHasBeenStarted
+}
+
 func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateConfig *ygot.ValidatedGoStruct) error {
 	diffChangelog := NewDiffChangelogMgmtT(changelog)
 	var err error
@@ -435,7 +452,7 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 		return err
 	}
 
-	_, err = this.findTransCommitConfirmTimeoutChange(diffChangelog)
+	commitConfirmTimeout, err := this.findTransCommitConfirmTimeoutChange(diffChangelog)
 	if err != nil {
 		return err
 	}
@@ -445,7 +462,12 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 	}
 
 	if configAction != oc.OpenconfigManagement_TRANS_TYPE_TRANS_DRY_RUN {
-		defer this.DiscardOrFinishTrans()
+		if (configAction == oc.OpenconfigManagement_TRANS_TYPE_TRANS_CONFIRM) && this.isTransPending() {
+			this.transConfirmationCancel()
+			this.Confirm()
+			return nil
+		}
+
 		if err = this.NewTransaction(); err != nil {
 			log.Errorf("Failed to start new transaction")
 			return err
@@ -456,20 +478,38 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 	}
 
 	if err = this.parseChangelogAndConvertToCommands(diffChangelog); err != nil {
+		this.DiscardOrFinishTrans()
 		return err
 	}
 
+	jsonChangelog, err := json.MarshalIndent(*changelog, "", "    ")
+	if err != nil {
+		log.Errorf("Failed to JSON dump: %s", err)
+		jsonChangelog = make([]byte, 1)
+		jsonChangelog[0] = ' '
+	}
+
+	if configAction == oc.OpenconfigManagement_TRANS_TYPE_TRANS_COMMIT_CONFIRM {
+		if err := this.CommitConfirm(); err != nil {
+			return err
+		}
+
+		this.transConfirmationCandidateConfig = candidateConfig
+		this.transConfirmationTimeoutCtx, this.transConfirmationCancel = context.WithCancel(context.Background())
+		go this.startCountingForConfirmationTimeout(&this.transConfirmationTimeoutCtx, commitConfirmTimeout)
+		return fmt.Errorf("\nWaiting %d seconds for confirmation changes\n%s",
+			commitConfirmTimeout, string(jsonChangelog))
+	}
+
+	defer this.DiscardOrFinishTrans()
 	if configAction != oc.OpenconfigManagement_TRANS_TYPE_TRANS_DRY_RUN {
 		if err := this.Commit(); err != nil {
 			log.Errorf("Failed to commit changes")
 			return err
 		}
 
-		if err := this.Confirm(); err != nil {
-			log.Errorf("Failed to confirm committed changes")
-			return err
-		}
-
+		this.configLookupTbl = this.transConfigLookupTbl.makeCopy()
+		this.DiscardOrFinishTrans()
 		log.Infof("Save new config")
 		return this.CommitCandidateConfig(candidateConfig)
 	}
@@ -477,14 +517,8 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 	// Deferred DiscardOrFinishTrans() will clean transConfigLookupTbl
 	this.transConfigLookupTbl = nil
 
-	jsonDump, err := json.MarshalIndent(*changelog, "", "    ")
-	if err != nil {
-		log.Errorf("Failed to JSON dump: %s", err)
-		jsonDump = make([]byte, 1)
-		jsonDump[0] = ' '
-	}
 	// It is not really error, we just passing information that we have finished dry running with success
-	return fmt.Errorf("\nDry running: requested changes are valid\n%s", string(jsonDump))
+	return fmt.Errorf("\nDry running: requested changes are valid\n%s", string(jsonChangelog))
 }
 
 func (this *ConfigMngrT) parseChangelogAndConvertToCommands(diffChangelog *DiffChangelogMgmtT) error {
@@ -558,4 +592,17 @@ func (this *ConfigMngrT) parseChangelogAndConvertToCommands(diffChangelog *DiffC
 	}
 
 	return nil
+}
+
+func (this *ConfigMngrT) startCountingForConfirmationTimeout(ctx *context.Context, timeout uint16) {
+	select {
+	case <-time.After(time.Duration(timeout) * time.Second):
+		if err := this.Rollback(); err != nil {
+			log.Errorf("%s", err)
+		} else {
+			log.Infof("Rollback changes")
+		}
+	case <-(*ctx).Done():
+		log.Infof("Cancelled counting for commit confirmation timeout")
+	}
 }
