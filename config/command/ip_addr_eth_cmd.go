@@ -136,7 +136,7 @@ func doIpv4AddrCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) er
 		prfxLen, err = utils.ConvertGoInterfaceIntoUint8(cmd.changes[ipv4AddrPrfxLenChangeIdxC].To)
 	}
 	if err != nil {
-		return nil
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)

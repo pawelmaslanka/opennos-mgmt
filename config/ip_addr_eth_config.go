@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	lib "golibext"
+	"net"
 	cmd "opennos-mgmt/config/command"
+	"opennos-mgmt/gnmi/modeldata/oc"
 	"opennos-mgmt/utils"
 
 	log "github.com/golang/glog"
@@ -335,6 +337,59 @@ func (this *ConfigMngrT) processDeleteIpv4AddrEthIntfFromChangelog(changelog *Di
 			}
 		} else {
 			break
+		}
+	}
+
+	return nil
+}
+
+func (this *ConfigMngrT) setIpv4AddrEthIntf(device *oc.Device) error {
+	for ethIdx, ipAddresses := range this.configLookupTbl.ipv4AddrByEth {
+		ethIfname := this.configLookupTbl.ethIfnameByIdx[ethIdx]
+		for _, addr := range ipAddresses.Strings() {
+			ipAddr, ipNet, err := net.ParseCIDR(addr)
+			if err != nil {
+				return err
+			}
+
+			prfxLen, bits := ipNet.Mask.Size()
+			if prfxLen == 0 && bits == 0 {
+				return fmt.Errorf("Failed to parse IP prefix length from address %s for Ethernet interface %s",
+					addr, ethIfname)
+			}
+
+			var ipChange diff.Change
+			ipChange.Type = diff.CREATE
+			ipChange.From = nil
+			ipChange.To = ipAddr.String()
+			ipChange.Path = make([]string, cmd.Ipv4AddrEthPathItemsCountC)
+			ipChange.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] = cmd.Ipv4AddrEthIntfPathItemC
+			ipChange.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] = ethIfname
+			ipChange.Path[cmd.Ipv4AddrEthSubintfPathItemIdxC] = cmd.Ipv4AddrEthSubintfPathItemC
+			ipChange.Path[cmd.Ipv4AddrEthSubintfIdxPathItemIdxC] = "0"
+			ipChange.Path[cmd.Ipv4AddrEthSubintfIpv4PathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4PathItemC
+			ipChange.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4AddrPathItemC
+			ipChange.Path[cmd.Ipv4AddrEthSubintfIpv4AddrIpPathItemIdxC] = ipAddr.String()
+			ipChange.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemC
+
+			var prfxLenChange diff.Change
+			prfxLenChange.Type = diff.CREATE
+			prfxLenChange.From = nil
+			prfxLenChange.To = uint8(prfxLen)
+			prfxLenChange.Path = make([]string, cmd.Ipv4AddrEthPathItemsCountC)
+			prfxLenChange.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] = cmd.Ipv4AddrEthIntfPathItemC
+			prfxLenChange.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] = ethIfname
+			prfxLenChange.Path[cmd.Ipv4AddrEthSubintfPathItemIdxC] = cmd.Ipv4AddrEthSubintfPathItemC
+			prfxLenChange.Path[cmd.Ipv4AddrEthSubintfIdxPathItemIdxC] = "0"
+			prfxLenChange.Path[cmd.Ipv4AddrEthSubintfIpv4PathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4PathItemC
+			prfxLenChange.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4AddrPathItemC
+			prfxLenChange.Path[cmd.Ipv4AddrEthSubintfIpv4AddrIpPathItemIdxC] = ipAddr.String()
+			prfxLenChange.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemC
+
+			command := cmd.NewSetIpv4AddrEthIntfCmdT(&ipChange, &prfxLenChange, this.ethSwitchMgmtClient)
+			if err = this.appendCmdToTransaction(ethIfname, command, setIpv4AddrForEthIntfC); err != nil {
+				return err
+			}
 		}
 	}
 

@@ -8,6 +8,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/kylelemons/godebug/pretty"
+
+	lib "golibext"
 )
 
 var (
@@ -24,49 +26,57 @@ func PrintProto(m proto.Message) {
 }
 
 // ConvertGoInterfaceIntoString converts Go interface{} into string value
-func ConvertGoInterfaceIntoString(value interface{}) (string, error) {
-	var str string
-	switch v := value.(type) {
+func ConvertGoInterfaceIntoString(valueToConvert interface{}) (string, error) {
+	var value string
+	switch v := valueToConvert.(type) {
 	case *string:
-		str = *v
+		value = *v
 	case string:
-		str = v
+		value = v
 	default:
-		return "", fmt.Errorf("Unexpected interface type to conversion: %v", value)
+		return "", fmt.Errorf("Unexpected interface type to conversion: %v", v)
 	}
 
-	return str, nil
+	return value, nil
 }
 
 // ConvertGoInterfaceIntoUint16 converts Go interface{} into uint16 value
-func ConvertGoInterfaceIntoUint16(vlanId interface{}) (uint16, error) {
-	var vid uint16
-	switch v := vlanId.(type) {
+func ConvertGoInterfaceIntoUint16(valueToConvert interface{}) (uint16, error) {
+	var value uint16
+	switch v := valueToConvert.(type) {
 	case *oc.Interface_Ethernet_SwitchedVlan_TrunkVlans_Union_Uint16:
-		vid = v.Uint16
+		value = v.Uint16
 	case oc.Interface_Ethernet_SwitchedVlan_TrunkVlans_Union_Uint16:
-		vid = v.Uint16
+		value = v.Uint16
+	case *lib.VidT:
+		value = uint16(*v)
+	case lib.VidT:
+		value = uint16(v)
 	case *uint16:
-		vid = *v
+		value = *v
 	case uint16:
-		vid = v
+		value = v
 	default:
-		return 0, fmt.Errorf("Cannot convert %v to any of [uint16, Interface_Ethernet_SwitchedVlan_TrunkVlans_Union], unsupported union type, got: %T", v, v)
+		return 0, fmt.Errorf("Cannot convert %v to any of [uint16, vidT, Interface_Ethernet_SwitchedVlan_TrunkVlans_Union], unsupported type, got: %T", v, v)
 	}
 
-	return vid, nil
+	return value, nil
 }
 
 // ConvertGoInterfaceIntoUint8 converts Go interface{} into uint8 value
 func ConvertGoInterfaceIntoUint8(value interface{}) (uint8, error) {
 	var rv uint8
 	switch v := value.(type) {
+	case *oc.E_OpenconfigIfEthernet_ETHERNET_SPEED:
+		rv = uint8(*v)
+	case oc.E_OpenconfigIfEthernet_ETHERNET_SPEED:
+		rv = uint8(v)
 	case *uint8:
 		rv = *v
 	case uint8:
 		rv = v
 	default:
-		return 0, fmt.Errorf("Cannot convert %v to any of [uint16, Interface_Ethernet_SwitchedVlan_TrunkVlans_Union], unsupported union type, got: %T", v, v)
+		return 0, fmt.Errorf("Cannot convert %v to any of [uint8, E_OpenconfigIfEthernet_ETHERNET_SPEED], unsupported union type, got: %T", v, v)
 	}
 
 	return rv, nil

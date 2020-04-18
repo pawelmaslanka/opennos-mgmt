@@ -4,6 +4,7 @@ import (
 	"fmt"
 	cmd "opennos-mgmt/config/command"
 	"opennos-mgmt/gnmi/modeldata/oc"
+	"strings"
 
 	log "github.com/golang/glog"
 	"github.com/r3labs/diff"
@@ -172,7 +173,7 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChange(ch *DiffChangeMgmt
 }
 
 func (this *ConfigMngrT) isEthIntfGoingToBeAvailableAfterPortBreakout(ifname string) bool {
-	if _, exists := this.transConfigLookupTbl.idxByEthName[ifname]; exists {
+	if _, exists := this.transConfigLookupTbl.idxByEthIfname[ifname]; exists {
 		return true
 	}
 
@@ -355,6 +356,74 @@ func (this *ConfigMngrT) processSetPortBreakoutChanSpeedFromChangelog(changelog 
 			}
 		} else {
 			break
+		}
+	}
+
+	return nil
+}
+
+func (this *ConfigMngrT) setPortBreakout(device *oc.Device) error {
+	var err error
+	for _, ethIfname := range this.configLookupTbl.ethIfnameByIdx {
+		// We want to process only not splitted ports
+		if strings.ContainsAny(ethIfname, ".") {
+			continue
+		}
+
+		comp := device.GetComponent(ethIfname)
+		if comp == nil {
+			continue
+		}
+
+		port := comp.GetPort()
+		if port == nil {
+			continue
+		}
+
+		mode := port.GetBreakoutMode()
+		if mode == nil {
+			continue
+		}
+
+		numChannels := mode.GetNumChannels()
+		if numChannels == uint8(cmd.PortBreakoutModeInvalidC) {
+			return fmt.Errorf("number of channels of port %s is unset", ethIfname)
+		}
+
+		if numChannels == uint8(cmd.PortBreakoutModeNoneC) {
+			continue
+		}
+
+		chanSpeed := mode.GetChannelSpeed()
+		if chanSpeed == oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET {
+			return fmt.Errorf("channel speed of port %s is unset", ethIfname)
+		}
+
+		var numChanChange diff.Change
+		numChanChange.Type = diff.CREATE
+		numChanChange.From = nil
+		numChanChange.To = numChannels
+		numChanChange.Path = make([]string, cmd.PortBreakoutPathItemsCountC)
+		numChanChange.Path[cmd.PortBreakoutCompPathItemIdxC] = cmd.PortBreakoutCompPathItemC
+		numChanChange.Path[cmd.PortBreakoutIfnamePathItemIdxC] = ethIfname
+		numChanChange.Path[cmd.PortBreakoutPortPathItemIdxC] = cmd.PortBreakoutPortPathItemC
+		numChanChange.Path[cmd.PortBreakoutModePathItemIdxC] = cmd.PortBreakoutModePathItemC
+		numChanChange.Path[cmd.PortBreakoutNumChanPathItemIdxC] = cmd.PortBreakoutNumChanPathItemC
+
+		var chanSpeedChange diff.Change
+		chanSpeedChange.Type = diff.CREATE
+		chanSpeedChange.From = nil
+		chanSpeedChange.To = chanSpeed
+		chanSpeedChange.Path = make([]string, cmd.PortBreakoutPathItemsCountC)
+		chanSpeedChange.Path[cmd.PortBreakoutCompPathItemIdxC] = cmd.PortBreakoutCompPathItemC
+		chanSpeedChange.Path[cmd.PortBreakoutIfnamePathItemIdxC] = ethIfname
+		chanSpeedChange.Path[cmd.PortBreakoutPortPathItemIdxC] = cmd.PortBreakoutPortPathItemC
+		chanSpeedChange.Path[cmd.PortBreakoutModePathItemIdxC] = cmd.PortBreakoutModePathItemC
+		chanSpeedChange.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] = cmd.PortBreakoutChanSpeedPathItemC
+
+		command := cmd.NewSetPortBreakoutCmdT(&numChanChange, &chanSpeedChange, this.ethSwitchMgmtClient)
+		if err = this.appendCmdToTransaction(ethIfname, command, setPortBreakoutC); err != nil {
+			return err
 		}
 	}
 

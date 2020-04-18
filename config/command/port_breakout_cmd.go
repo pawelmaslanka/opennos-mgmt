@@ -7,6 +7,7 @@ import (
 	"opennos-eth-switch-service/mgmt/interfaces"
 	"opennos-eth-switch-service/mgmt/platform"
 	"opennos-mgmt/gnmi/modeldata/oc"
+	"opennos-mgmt/utils"
 	"time"
 
 	"github.com/r3labs/diff"
@@ -130,12 +131,33 @@ func (this *commandT) configurePortBreakout(shouldBeAbleOnlyToUndo bool) error {
 	}
 
 	this.dumpInternalData()
-	numChannels, err := convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
-	if err != nil {
-		return err
+	var err error
+	var numChannels platform.PortBreakoutRequest_NumChannels
+	var chanSpeedConv uint8
+
+	if this.changes[numChannelsChangeIdxC].Type != diff.DELETE {
+		numChannels, err = convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].To.(uint8)))
+		if err != nil {
+			return err
+		}
+
+		chanSpeedConv, err = utils.ConvertGoInterfaceIntoUint8(this.changes[channelSpeedChangeIdxC].To)
+		if err != nil {
+			return err
+		}
+	} else {
+		numChannels, err = convertOcNumChanIntoMgmtPortBreakoutReq(PortBreakoutModeT(this.changes[numChannelsChangeIdxC].From.(uint8)))
+		if err != nil {
+			return err
+		}
+
+		chanSpeedConv, err = utils.ConvertGoInterfaceIntoUint8(this.changes[channelSpeedChangeIdxC].From)
+		if err != nil {
+			return err
+		}
 	}
 
-	channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(this.changes[channelSpeedChangeIdxC].To.(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED))
+	channelSpeed, err := convertOcChanSpeedIntoMgmtPortBreakoutReq(oc.E_OpenconfigIfEthernet_ETHERNET_SPEED(chanSpeedConv))
 	if err != nil {
 		return err
 	}

@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	lib "golibext"
 	cmd "opennos-mgmt/config/command"
 	"opennos-mgmt/gnmi/modeldata/oc"
+	"opennos-mgmt/utils"
 
 	log "github.com/golang/glog"
 	"github.com/jinzhu/copier"
@@ -233,11 +235,12 @@ func (this *ConfigMngrT) validateSetAccessVlanEthIntfChange(changeItem *DiffChan
 		return fmt.Errorf("Ethernet interface %s is not available", ifname)
 	}
 
-	vid, err := convertInterfaceIntoVlanId(changeItem.Change.To)
+	vid16, err := utils.ConvertGoInterfaceIntoUint16(changeItem.Change.To)
 	if err != nil {
 		return err
 	}
 
+	vid := lib.VidT(vid16)
 	vlanModeChange, exists := findSetVlanModeEthIntfChange(changelog)
 	if exists {
 		reqVlanMode := oc.E_OpenconfigVlan_VlanModeType(*vlanModeChange.Change.To.(*uint8))
@@ -280,11 +283,12 @@ func (this *ConfigMngrT) validateDeleteAccessVlanEthIntfChange(changeItem *DiffC
 		return fmt.Errorf("Ethernet interface %s is not available", ifname)
 	}
 
-	vid, err := convertInterfaceIntoVlanId(changeItem.Change.From)
+	vid16, err := utils.ConvertGoInterfaceIntoUint16(changeItem.Change.From)
 	if err != nil {
 		return err
 	}
 
+	vid := lib.VidT(vid16)
 	vlanMode, err := this.transConfigLookupTbl.getVlanModeEthIntf(ifname)
 	if vlanMode != oc.OpenconfigVlan_VlanModeType_ACCESS {
 		return fmt.Errorf("Deletion of access VLAN %d from Ethernet interface %s is disallowed if VLAN interface mode is not access. Current mode: %v", vid, ifname, vlanMode)
@@ -335,11 +339,12 @@ func (this *ConfigMngrT) validateSetNativeVlanEthIntfChange(changeItem *DiffChan
 		return fmt.Errorf("Ethernet interface %s is not available", ifname)
 	}
 
-	vid, err := convertInterfaceIntoVlanId(changeItem.Change.To)
+	vid16, err := utils.ConvertGoInterfaceIntoUint16(changeItem.Change.To)
 	if err != nil {
 		return err
 	}
 
+	vid := lib.VidT(vid16)
 	vlanModeChange, exists := findSetVlanModeEthIntfChange(changelog)
 	if exists {
 		reqVlanMode := oc.E_OpenconfigVlan_VlanModeType(*vlanModeChange.Change.To.(*uint8))
@@ -382,11 +387,12 @@ func (this *ConfigMngrT) validateDeleteNativeVlanEthIntfChange(changeItem *DiffC
 		return fmt.Errorf("Ethernet interface %s is not available", ifname)
 	}
 
-	vid, err := convertInterfaceIntoVlanId(changeItem.Change.From)
+	vid16, err := utils.ConvertGoInterfaceIntoUint16(changeItem.Change.From)
 	if err != nil {
 		return err
 	}
 
+	vid := lib.VidT(vid16)
 	vlanMode, err := this.transConfigLookupTbl.getVlanModeEthIntf(ifname)
 	if vlanMode != oc.OpenconfigVlan_VlanModeType_TRUNK {
 		return fmt.Errorf("Deletion of native VLAN %d from Ethernet interface %s is disallowed if VLAN interface mode is not trunk. Current mode: %v", vid, ifname, vlanMode)
@@ -437,11 +443,12 @@ func (this *ConfigMngrT) validateSetTrunkVlanEthIntfChange(changeItem *DiffChang
 		return fmt.Errorf("Ethernet interface %s is not available", ifname)
 	}
 
-	vid, err := convertInterfaceIntoVlanId(changeItem.Change.To)
+	vid16, err := utils.ConvertGoInterfaceIntoUint16(changeItem.Change.To)
 	if err != nil {
 		return err
 	}
 
+	vid := lib.VidT(vid16)
 	vlanModeChange, exists := findSetVlanModeEthIntfChange(changelog)
 	if exists {
 		reqVlanMode := oc.E_OpenconfigVlan_VlanModeType(*vlanModeChange.Change.To.(*uint8))
@@ -487,11 +494,12 @@ func (this *ConfigMngrT) validateDeleteTrunkVlanEthIntfChange(changeItem *DiffCh
 		return fmt.Errorf("Ethernet interface %s is not available", ifname)
 	}
 
-	vid, err := convertInterfaceIntoVlanId(changeItem.Change.From)
+	vid16, err := utils.ConvertGoInterfaceIntoUint16(changeItem.Change.From)
 	if err != nil {
 		return err
 	}
 
+	vid := lib.VidT(vid16)
 	vlanMode, err := this.transConfigLookupTbl.getVlanModeEthIntf(ifname)
 	if vlanMode != oc.OpenconfigVlan_VlanModeType_TRUNK {
 		return fmt.Errorf("Deletion of trunk VLAN %d from Ethernet interface %s is disallowed if VLAN interface mode is not trunk. Current mode: %v", vid, ifname, vlanMode)
@@ -665,6 +673,107 @@ func (this *ConfigMngrT) processDeleteTrunkVlanEthIntfFromChangelog(changelog *D
 			}
 		} else {
 			break
+		}
+	}
+
+	return nil
+}
+
+func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
+	var err error
+	for _, ethIfname := range this.configLookupTbl.ethIfnameByIdx {
+		intf := device.GetInterface(ethIfname)
+		if intf == nil {
+			continue
+		}
+
+		eth := intf.GetEthernet()
+		if eth == nil {
+			continue
+		}
+
+		swVlan := eth.GetSwitchedVlan()
+		if swVlan == nil {
+			continue
+		}
+
+		mode := swVlan.GetInterfaceMode()
+		if mode == oc.OpenconfigVlan_VlanModeType_UNSET {
+			continue
+		}
+
+		var modeChange diff.Change
+		modeChange.Type = diff.CREATE
+		modeChange.From = nil
+		modeChange.To = int32(mode)
+		modeChange.Path = make([]string, cmd.VlanModeEthPathItemsCountC)
+		modeChange.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
+		modeChange.Path[cmd.VlanEthIfnamePathItemIdxC] = ethIfname
+		modeChange.Path[cmd.VlanEthEthernetPathItemIdxC] = cmd.VlanEthEthernetPathItemC
+		modeChange.Path[cmd.VlanEthSwVlanPathItemIdxC] = cmd.VlanEthSwVlanPathItemC
+		modeChange.Path[cmd.VlanEthVlanModePathItemIdxC] = cmd.VlanEthVlanModePathItemC
+		vlanModeCmd := cmd.NewSetVlanModeEthIntfCmdT(&modeChange, this.ethSwitchMgmtClient)
+		if err = this.appendCmdToTransaction(ethIfname, vlanModeCmd, setVlanModeForEthIntfC); err != nil {
+			return err
+		}
+
+		switch mode {
+		case oc.OpenconfigVlan_VlanModeType_ACCESS:
+			if accessVlan, exists := this.configLookupTbl.vlanAccessByEth[this.configLookupTbl.idxByEthIfname[ethIfname]]; exists {
+				var accessChange diff.Change
+				accessChange.Type = diff.CREATE
+				accessChange.From = nil
+				accessChange.To = accessVlan
+				accessChange.Path = make([]string, cmd.AccessVlanEthPathItemsCountC)
+				accessChange.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
+				accessChange.Path[cmd.VlanEthIfnamePathItemIdxC] = ethIfname
+				accessChange.Path[cmd.VlanEthEthernetPathItemIdxC] = cmd.VlanEthEthernetPathItemC
+				accessChange.Path[cmd.VlanEthSwVlanPathItemIdxC] = cmd.VlanEthSwVlanPathItemC
+				accessChange.Path[cmd.VlanEthAccessVlanPathItemIdxC] = cmd.VlanEthAccessVlanPathItemC
+
+				accessVlanCmd := cmd.NewSetAccessVlanEthIntfCmdT(&accessChange, this.ethSwitchMgmtClient)
+				if err = this.appendCmdToTransaction(ethIfname, accessVlanCmd, setAccessVlanForEthIntfC); err != nil {
+					return err
+				}
+			}
+
+		case oc.OpenconfigVlan_VlanModeType_TRUNK:
+			if nativeVlan, exists := this.configLookupTbl.vlanNativeByEth[this.configLookupTbl.idxByEthIfname[ethIfname]]; exists {
+				var nativeChange diff.Change
+				nativeChange.Type = diff.CREATE
+				nativeChange.From = nil
+				nativeChange.To = nativeVlan
+				nativeChange.Path = make([]string, cmd.NativeVlanEthPathItemsCountC)
+				nativeChange.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
+				nativeChange.Path[cmd.VlanEthIfnamePathItemIdxC] = ethIfname
+				nativeChange.Path[cmd.VlanEthEthernetPathItemIdxC] = cmd.VlanEthEthernetPathItemC
+				nativeChange.Path[cmd.VlanEthSwVlanPathItemIdxC] = cmd.VlanEthSwVlanPathItemC
+				nativeChange.Path[cmd.VlanEthNativeVlanPathItemIdxC] = cmd.VlanEthNativeVlanPathItemC
+
+				nativeVlanCmd := cmd.NewSetNativeVlanEthIntfCmdT(&nativeChange, this.ethSwitchMgmtClient)
+				if err = this.appendCmdToTransaction(ethIfname, nativeVlanCmd, setNativeVlanForEthIntfC); err != nil {
+					return err
+				}
+			}
+
+			for i, trunkVlan := range this.configLookupTbl.vlanTrunkByEth[this.configLookupTbl.idxByEthIfname[ethIfname]].VidTs() {
+				var trunkChange diff.Change
+				trunkChange.Type = diff.CREATE
+				trunkChange.From = nil
+				trunkChange.To = trunkVlan
+				trunkChange.Path = make([]string, cmd.TrunkVlanEthPathItemsCountC)
+				trunkChange.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
+				trunkChange.Path[cmd.VlanEthIfnamePathItemIdxC] = ethIfname
+				trunkChange.Path[cmd.VlanEthEthernetPathItemIdxC] = cmd.VlanEthEthernetPathItemC
+				trunkChange.Path[cmd.VlanEthSwVlanPathItemIdxC] = cmd.VlanEthSwVlanPathItemC
+				trunkChange.Path[cmd.VlanEthTrunkVlanPathItemIdxC] = cmd.VlanEthTrunkVlanPathItemC
+				trunkChange.Path[cmd.TrunkVlanEthIdxPathItemIdxC] = fmt.Sprintf("%d", i)
+
+				trunkVlanCmd := cmd.NewSetTrunkVlanEthIntfCmdT(&trunkChange, this.ethSwitchMgmtClient)
+				if err = this.appendCmdToTransaction(ethIfname, trunkVlanCmd, setTrunkVlanForEthIntfC); err != nil {
+					return err
+				}
+			}
 		}
 	}
 

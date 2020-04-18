@@ -26,18 +26,18 @@ type OrdinalNumberT uint16
 const (
 	unorderedActionInTransactionC    OrdinalNumberT = iota
 	deleteIpv4AddrFromEthIntfC                      // Remove IPv4/CIDRv4 address from Ethernet interface
-	deleteIpv4AddrFromLagIntfC                      // Remove IPv4/CIDRv4 address from LAG interface
+	deleteIpv4AddrFromAggIntfC                      // Remove IPv4/CIDRv4 address from LAG interface
 	deleteIpv6AddrFromEthIntfC                      // Remove IPv6/CIDRv6 address from Ethernet interface
-	deleteIpv6AddrFromLagIntfC                      // Remove IPv6/CIDRv6 address from LAG interface
+	deleteIpv6AddrFromAggIntfC                      // Remove IPv6/CIDRv6 address from LAG interface
 	deleteEthIntfFromAccessVlanC                    // Remove Ethernet interface from access VLAN
-	deleteLagIntfFromAccessVlanC                    // Remove LAG interface from access VLAN
+	deleteAggIntfFromAccessVlanC                    // Remove LAG interface from access VLAN
 	deleteEthIntfFromNativeVlanC                    // Remove Ethernet interface from native VLAN
-	deleteLagIntfFromNativeVlanC                    // Remove LAG interface from native VLAN
+	deleteAggIntfFromNativeVlanC                    // Remove LAG interface from native VLAN
 	deleteEthIntfFromTrunkVlanC                     // Remove Ethernet interface from trunk VLAN
-	deleteEthIntfFromLagIntfC                       // Remove Ethernet interface from LAG membership
-	deleteLagIntfParamsC                            // Remove LAG parameters
-	deleteLagIntfMemberC                            // Remove Ethernet interface from LAG
-	deleteLagIntfC                                  // Delete LAG interface
+	deleteEthIntfFromAggIntfC                       // Remove Ethernet interface from LAG membership
+	deleteAggIntfParamsC                            // Remove LAG parameters
+	deleteAggIntfMemberC                            // Remove Ethernet interface from LAG
+	deleteAggIntfC                                  // Delete LAG interface
 	deletePortBreakoutC                             // Combine multiple logical ports into single port
 	setPortBreakoutC                                // Break out front panel port into multiple logical ports
 	setPortBreakoutChanSpeedC                       // Set channel speed on logical ports (lanes)
@@ -45,22 +45,22 @@ const (
 	setPortAutoNegForEthIntfC                       // Enable or disable auto-negotiation on port
 	setPortMtuForEthIntfC                           // Set MTU on port
 	setPortSpeedForEthIntfC                         // Set port speed
-	setLagIntfC                                     // Create new LAG interface
-	setLagIntfParamsC                               // Set LAG parameters
-	setLagIntfMemberC                               // Add Ethernet interface to LAG
-	setIpv4AddrForEthIntfC                          // Assign IPv4/CIDRv4 address to Ethernet interface
-	setIpv4AddrForLagIntfC                          // Assign IPv4/CIDRv4 address to LAG interface
-	setIpv6AddrForEthIntfC                          // Assign IPv6/CIDRv6 address to Ethernet interface
-	setIpv6AddrForLagIntfC                          // Assign IPv6/CIDRv6 address to LAG interface
+	setAggIntfC                                     // Create new LAG interface
+	setAggIntfParamsC                               // Set LAG parameters
+	setAggIntfMemberC                               // Add Ethernet interface to LAG
 	setVlanModeForEthIntfC                          // Set VLAN interface mode for Ethernet interface
-	setVlanModeForLagIntfC                          // Set VLAN interface mode for LAG interface
+	setVlanModeForAggIntfC                          // Set VLAN interface mode for LAG interface
 	setAccessVlanForEthIntfC                        // Assign Ethernet interface to access VLAN
-	setAccessVlanForLagIntfC                        // Assign LAG interface to access VLAN
+	setAccessVlanForAggIntfC                        // Assign LAG interface to access VLAN
 	setNativeVlanForEthIntfC                        // Assign Ethernet interface to native VLAN
-	setNativeVlanForLagIntfC                        // Assign LAG interface to native VLAN
+	setNativeVlanForAggIntfC                        // Assign LAG interface to native VLAN
 	setTrunkVlanForEthIntfC                         // Assign Ethernet interface to trunk VLAN
-	setTrunkVlanForLagIntfC                         // Assign LAG interface to trunk VLAN
-	setLagTypeOfLagIntfC                            // Set the type of LAG
+	setTrunkVlanForAggIntfC                         // Assign LAG interface to trunk VLAN
+	setIpv4AddrForEthIntfC                          // Assign IPv4/CIDRv4 address to Ethernet interface
+	setIpv4AddrForAggIntfC                          // Assign IPv4/CIDRv4 address to LAG interface
+	setIpv6AddrForEthIntfC                          // Assign IPv6/CIDRv6 address to Ethernet interface
+	setIpv6AddrForAggIntfC                          // Assign IPv6/CIDRv6 address to LAG interface
+	setLagTypeOfAggIntfC                            // Set the type of LAG
 	setLacpIntervalC                                // Set the period between LACP messages
 	setLacpModeC                                    // Set LACP activity - active or passive
 	maxNumberOfActionsInTransactionC                // Defines maximum number of possible actions in transaction
@@ -120,6 +120,7 @@ func (this *ConfigMngrT) NewTransaction() error {
 	}
 	ethSwitchMgmtClient := mgmt.NewEthSwitchMgmtClient(conn)
 	nilCmd := &cmd.NilCmdT{}
+	// TODO: Check if it is still required?
 	var i OrdinalNumberT
 	for i = 0; i < maxNumberOfActionsInTransactionC; i++ {
 		this.cmdByIfname[i] = make(cmdByIfnameT, 1)
@@ -258,29 +259,29 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 
 	log.Infof("Dump config model: %+v", configModel)
 	device := configModel.(*oc.Device)
-	for intfName := range device.Interface {
-		if err := this.configLookupTbl.addNewInterfaceIfItDoesNotExist(intfName); err != nil {
+	for ethIfname := range device.Interface {
+		if err := this.configLookupTbl.addNewInterfaceIfItDoesNotExist(ethIfname); err != nil {
 			return err
 		}
 	}
 
-	for intfName := range this.configLookupTbl.idxByEthName {
-		intf := device.Interface[intfName]
+	for ethIfname := range this.configLookupTbl.idxByEthIfname {
+		intf := device.Interface[ethIfname]
 		if intf == nil {
-			log.Info("Cannot find interface ", intfName)
-			return fmt.Errorf("Failed to get interface %s info", intfName)
+			log.Info("Cannot find interface ", ethIfname)
+			return fmt.Errorf("Failed to get interface %s info", ethIfname)
 		}
 
 		eth := intf.GetEthernet()
 		if eth != nil {
-			log.Infof("Configuring interface %s as LAG member", intfName)
-			if err := this.configLookupTbl.parseInterfaceAsLagMember(intfName, eth); err != nil {
+			log.Infof("Configuring interface %s as LAG member", ethIfname)
+			if err := this.configLookupTbl.parseInterfaceAsLagMember(ethIfname, eth); err != nil {
 				return err
 			}
 
 			swVlan := eth.GetSwitchedVlan()
 			if swVlan != nil {
-				if err := this.configLookupTbl.parseVlanForIntf(intfName, swVlan); err != nil {
+				if err := this.configLookupTbl.parseVlanForIntf(ethIfname, swVlan); err != nil {
 					return err
 				}
 			}
@@ -288,23 +289,23 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 
 		subIntf := intf.GetSubinterface(0)
 		if subIntf != nil {
-			if err := this.configLookupTbl.parseSubinterface(intfName, subIntf); err != nil {
+			if err := this.configLookupTbl.parseSubinterface(ethIfname, subIntf); err != nil {
 				return err
 			}
 		}
 	}
 
-	for lagName := range this.configLookupTbl.idxByLagName {
-		lag := device.Interface[lagName]
+	for aggIfname := range this.configLookupTbl.idxByAggIfname {
+		lag := device.Interface[aggIfname]
 		if lag == nil {
-			return fmt.Errorf("Failed to get LAG %s info", lagName)
+			return fmt.Errorf("Failed to get LAG %s info", aggIfname)
 		}
 
 		agg := lag.GetAggregation()
 		if agg != nil {
 			swVlan := agg.GetSwitchedVlan()
 			if swVlan != nil {
-				if err := this.configLookupTbl.parseVlanForLagIntf(lagName, swVlan); err != nil {
+				if err := this.configLookupTbl.parseVlanForAggIntf(aggIfname, swVlan); err != nil {
 					return err
 				}
 			}
@@ -318,7 +319,45 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 	log.Infof("There are loaded %d interfaces and %d LAGs",
 		this.configLookupTbl.idxOfLastAddedIntf, this.configLookupTbl.idxOfLastAddedLag)
 
+	if err = this.configureDevice(&configModel); err != nil {
+		return err
+	}
+
 	return this.CommitCandidateConfig(&configModel)
+}
+
+func (this *ConfigMngrT) configureDevice(configModel *ygot.ValidatedGoStruct) error {
+	device := (*configModel).(*oc.Device)
+	var err error
+	if err = this.NewTransaction(); err != nil {
+		return err
+	}
+
+	if err = this.setPortBreakout(device); err != nil {
+		return err
+	}
+
+	if err = this.setAggIntf(device); err != nil {
+		return err
+	}
+
+	if err = this.setAggIntfMember(device); err != nil {
+		return err
+	}
+
+	if err = this.setVlanEthIntf(device); err != nil {
+		return err
+	}
+
+	if err = this.setIpv4AddrEthIntf(device); err != nil {
+		return err
+	}
+
+	if err = this.Commit(); err != nil {
+		return err
+	}
+
+	return this.DiscardOrFinishTrans()
 }
 
 func (this *ConfigMngrT) appendCmdToTransaction(ifname string, cmdAdd cmd.CommandI, idx OrdinalNumberT) error {
@@ -364,7 +403,7 @@ func (this *ConfigMngrT) GetDiffRunningConfigWithCandidateConfig(candidateConfig
 }
 
 func (this *ConfigMngrT) isEthIntfAvailable(ifname string) bool {
-	if _, exists := this.configLookupTbl.idxByEthName[ifname]; exists {
+	if _, exists := this.configLookupTbl.idxByEthIfname[ifname]; exists {
 		return true
 	}
 
@@ -413,72 +452,8 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 		this.transConfigLookupTbl = this.configLookupTbl.makeCopy()
 	}
 
-	for {
-		// Deletion section
-		if err = this.processDeleteIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processDeleteAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processDeleteNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processDeleteTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processDeleteLagIntfMemberFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processDeleteLagIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		// Set section
-		if err = this.processSetPortBreakoutFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processSetPortBreakoutChanSpeedFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processSetLagIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processSetLagIntfMemberFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processSetIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processSetVlanModeEthIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processSetAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processSetNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		if err = this.processSetTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
-			return err
-		}
-		// if len(changedItem.Change.Path) > 4 {
-		// 	if "NativeVlan" == changedItem.Change.Path[4] {
-		// 		port := make([]string, 1)
-		// 		port[0] = changedItem.Change.Path[1]
-		// 		// TODO: Uncomment if build is dedicated for target device
-		// 		// if err := vlan.SetNativeVlan(port, changedItem.To.(uint16)); err != nil {
-		// 		// 	log.Errorf("Failed to set native VLAN")
-		// 		// 	return err
-		// 		// }
-		// 		log.Infof("Native VLAN has been changed to %d on port %s",
-		// 			changedItem.Change.To, changedItem.Change.Path[1])
-		// 	}
-		// } else if len(changedItem.Change.Path) > 2 {
-		// 	if "Mtu" == changedItem.Change.Path[2] {
-		// 		log.Infof("Changing MTU to %d on port %s", changedItem.Change.To, changedItem.Change.Path[1])
-		// 	}
-		// }
-		break
+	if err = this.parseChangelogAndConvertToCommands(diffChangelog); err != nil {
+		return err
 	}
 
 	if configAction != oc.OpenconfigManagement_TRANS_TYPE_TRANS_DRY_RUN {
@@ -501,4 +476,77 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 
 	// It is not really error, we just passing information that we have finished dry running with success
 	return fmt.Errorf("Dry running: requested changes are valid")
+}
+
+func (this *ConfigMngrT) parseChangelogAndConvertToCommands(diffChangelog *DiffChangelogMgmtT) error {
+	var err error
+	for {
+		// Deletion section
+		if err = this.processDeleteIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processDeleteAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processDeleteNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processDeleteTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processDeleteAggIntfMemberFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processDeleteAggIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		// Set section
+		if err = this.processSetPortBreakoutFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetPortBreakoutChanSpeedFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetAggIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetAggIntfMemberFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetVlanModeEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetAccessVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetNativeVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetTrunkVlanEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetIpv4AddrEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		// if len(changedItem.Change.Path) > 4 {
+		// 	if "NativeVlan" == changedItem.Change.Path[4] {
+		// 		port := make([]string, 1)
+		// 		port[0] = changedItem.Change.Path[1]
+		// 		// TODO: Uncomment if build is dedicated for target device
+		// 		// if err := vlan.SetNativeVlan(port, changedItem.To.(uint16)); err != nil {
+		// 		// 	log.Errorf("Failed to set native VLAN")
+		// 		// 	return err
+		// 		// }
+		// 		log.Infof("Native VLAN has been changed to %d on port %s",
+		// 			changedItem.Change.To, changedItem.Change.Path[1])
+		// 	}
+		// } else if len(changedItem.Change.Path) > 2 {
+		// 	if "Mtu" == changedItem.Change.Path[2] {
+		// 		log.Infof("Changing MTU to %d on port %s", changedItem.Change.To, changedItem.Change.Path[1])
+		// 	}
+		// }
+		break
+	}
+
+	return nil
 }

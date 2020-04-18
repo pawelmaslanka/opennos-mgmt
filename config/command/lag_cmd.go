@@ -11,18 +11,18 @@ import (
 )
 
 const (
-	LagIntfInterfacePathItemIdxC      = 0
-	LagIntfIfnamePathItemIdxC         = 1
-	LagIntfNamePathItemIdxC           = 2
-	LagIntfPathItemsCountC            = 3
-	LagIntfMemberEthernetPathItemIdxC = 2
-	LagIntfMemberAggIdPathItemIdxC    = 3
-	LagIntfMemberPathItemsCountC      = 4
+	AggIntfInterfacePathItemIdxC      = 0
+	AggIntfIfnamePathItemIdxC         = 1
+	AggIntfNamePathItemIdxC           = 2
+	AggIntfPathItemsCountC            = 3
+	AggIntfMemberEthernetPathItemIdxC = 2
+	AggIntfMemberAggIdPathItemIdxC    = 3
+	AggIntfMemberPathItemsCountC      = 4
 
-	LagIntfInterfacePathItemC      = "Interface"
-	LagIntfMemberEthernetPathItemC = "Ethernet"
-	LagIntfMemberAggIdPathItemC    = "AggregateId"
-	LagIntfNamePathItemC           = "Name"
+	AggIntfInterfacePathItemC      = "Interface"
+	AggIntfMemberEthernetPathItemC = "Ethernet"
+	AggIntfMemberAggIdPathItemC    = "AggregateId"
+	AggIntfNamePathItemC           = "Name"
 )
 
 const (
@@ -30,167 +30,167 @@ const (
 	maxLagChangeIdxC
 )
 
-// SetLagIntfCmdT implements command for creating LAG interface
-type SetLagIntfCmdT struct {
+// SetAggIntfCmdT implements command for creating LAG interface
+type SetAggIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
 }
 
-// NewSetLagIntfCmdT creates new instance of SetLagIntfCmdT type
-func NewSetLagIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetLagIntfCmdT {
+// NewSetAggIntfCmdT creates new instance of SetAggIntfCmdT type
+func NewSetAggIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetAggIntfCmdT {
 	changes := make([]*diff.Change, maxLagChangeIdxC)
 	changes[lagChangeIdxC] = vlan
-	return &SetLagIntfCmdT{
-		commandT: newCommandT("set lag interface", changes, ethSwitchMgmt),
+	return &SetAggIntfCmdT{
+		commandT: newCommandT("set aggregate interface", changes, ethSwitchMgmt),
 	}
 }
 
 // Execute implements the same method from CommandI interface and creates LAG interface
-func (this *SetLagIntfCmdT) Execute() error {
+func (this *SetAggIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
 	isGoingToBeDeleted := false
-	return doLagIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+	return doAggIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
-func (this *SetLagIntfCmdT) Undo() error {
+func (this *SetAggIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
 	isGoingToBeDeleted := true
-	return doLagIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+	return doAggIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
-func (this *SetLagIntfCmdT) GetName() string {
+func (this *SetAggIntfCmdT) GetName() string {
 	return this.name
 }
 
 // Equals checks if 'this' command and 'other' command are the same... do the same thing
-func (this *SetLagIntfCmdT) Equals(other CommandI) bool {
-	otherCmd := other.(*SetLagIntfCmdT)
+func (this *SetAggIntfCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*SetAggIntfCmdT)
 	return this.equals(otherCmd.commandT)
 }
 
-// DeleteLagIntfCmdT implements command for deletion of LAG interface
-type DeleteLagIntfCmdT struct {
+// DeleteAggIntfCmdT implements command for deletion of LAG interface
+type DeleteAggIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
 }
 
-// NewDeleteLagIntfCmdT creates new instance of DeleteLagIntfCmdT type
-func NewDeleteLagIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *DeleteLagIntfCmdT {
+// NewDeleteAggIntfCmdT creates new instance of DeleteAggIntfCmdT type
+func NewDeleteAggIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *DeleteAggIntfCmdT {
 	changes := make([]*diff.Change, maxLagChangeIdxC)
 	changes[lagChangeIdxC] = vlan
-	return &DeleteLagIntfCmdT{
-		commandT: newCommandT("delete lag interface", changes, ethSwitchMgmt),
+	return &DeleteAggIntfCmdT{
+		commandT: newCommandT("delete aggregate interface", changes, ethSwitchMgmt),
 	}
 }
 
 // Execute implements the same method from CommandI interface and deletes LAG interface
-func (this *DeleteLagIntfCmdT) Execute() error {
+func (this *DeleteAggIntfCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
 	isGoingToBeDeleted := true
-	return doLagIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+	return doAggIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
-func (this *DeleteLagIntfCmdT) Undo() error {
+func (this *DeleteAggIntfCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
 	isGoingToBeDeleted := false
-	return doLagIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+	return doAggIntfCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
-func (this *DeleteLagIntfCmdT) GetName() string {
+func (this *DeleteAggIntfCmdT) GetName() string {
 	return this.name
 }
 
 // Equals checks if 'this' command and 'other' command are the same... do the same thing
-func (this *DeleteLagIntfCmdT) Equals(other CommandI) bool {
-	otherCmd := other.(*DeleteLagIntfCmdT)
+func (this *DeleteAggIntfCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*DeleteAggIntfCmdT)
 	return this.equals(otherCmd.commandT)
 }
 
-// SetLagIntfMemberCmdT implements command for add Ethernet interface to LAG
-type SetLagIntfMemberCmdT struct {
+// SetAggIntfMemberCmdT implements command for add Ethernet interface to LAG
+type SetAggIntfMemberCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
 }
 
-// NewSetLagIntfMemberCmdT creates new instance of SetLagIntfMemberCmdT type
-func NewSetLagIntfMemberCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetLagIntfMemberCmdT {
+// NewSetAggIntfMemberCmdT creates new instance of SetAggIntfMemberCmdT type
+func NewSetAggIntfMemberCmdT(change *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetAggIntfMemberCmdT {
 	changes := make([]*diff.Change, maxLagChangeIdxC)
-	changes[lagChangeIdxC] = vlan
-	return &SetLagIntfMemberCmdT{
-		commandT: newCommandT("set lag interface member", changes, ethSwitchMgmt),
+	changes[lagChangeIdxC] = change
+	return &SetAggIntfMemberCmdT{
+		commandT: newCommandT("set aggregate interface member", changes, ethSwitchMgmt),
 	}
 }
 
 // Execute implements the same method from CommandI interface and adds Ethernet interface to LAG
-func (this *SetLagIntfMemberCmdT) Execute() error {
+func (this *SetAggIntfMemberCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
 	isGoingToBeDeleted := false
-	return doLagIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+	return doAggIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
-func (this *SetLagIntfMemberCmdT) Undo() error {
+func (this *SetAggIntfMemberCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
 	isGoingToBeDeleted := true
-	return doLagIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+	return doAggIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
-func (this *SetLagIntfMemberCmdT) GetName() string {
+func (this *SetAggIntfMemberCmdT) GetName() string {
 	return this.name
 }
 
 // Equals checks if 'this' command and 'other' command are the same... do the same thing
-func (this *SetLagIntfMemberCmdT) Equals(other CommandI) bool {
-	otherCmd := other.(*SetLagIntfMemberCmdT)
+func (this *SetAggIntfMemberCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*SetAggIntfMemberCmdT)
 	return this.equals(otherCmd.commandT)
 }
 
-// DeleteLagIntfMemberCmdT implements command for remove Ethernet interface from LAG
-type DeleteLagIntfMemberCmdT struct {
+// DeleteAggIntfMemberCmdT implements command for remove Ethernet interface from LAG
+type DeleteAggIntfMemberCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
 }
 
-// NewDeleteLagIntfMemberCmdT creates new instance of DeleteLagIntfMemberCmdT type
-func NewDeleteLagIntfMemberCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *DeleteLagIntfMemberCmdT {
+// NewDeleteAggIntfMemberCmdT creates new instance of DeleteAggIntfMemberCmdT type
+func NewDeleteAggIntfMemberCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *DeleteAggIntfMemberCmdT {
 	changes := make([]*diff.Change, maxLagChangeIdxC)
 	changes[lagChangeIdxC] = vlan
-	return &DeleteLagIntfMemberCmdT{
-		commandT: newCommandT("delete lag interface member", changes, ethSwitchMgmt),
+	return &DeleteAggIntfMemberCmdT{
+		commandT: newCommandT("delete aggregate interface member", changes, ethSwitchMgmt),
 	}
 }
 
 // Execute implements the same method from CommandI interface and removes Ethernet interface from LAG
-func (this *DeleteLagIntfMemberCmdT) Execute() error {
+func (this *DeleteAggIntfMemberCmdT) Execute() error {
 	shouldBeAbleOnlyToUndo := false
 	isGoingToBeDeleted := true
-	return doLagIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+	return doAggIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // Undo implements the same method from CommandI interface and withdraws changes performed by
 // previously execution of Execute() method
-func (this *DeleteLagIntfMemberCmdT) Undo() error {
+func (this *DeleteAggIntfMemberCmdT) Undo() error {
 	shouldBeAbleOnlyToUndo := true
 	isGoingToBeDeleted := false
-	return doLagIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+	return doAggIntfMemberCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
 }
 
 // GetName implements the same method from CommandI interface and returns name of command
-func (this *DeleteLagIntfMemberCmdT) GetName() string {
+func (this *DeleteAggIntfMemberCmdT) GetName() string {
 	return this.name
 }
 
 // Equals checks if 'this' command and 'other' command are the same... do the same thing
-func (this *DeleteLagIntfMemberCmdT) Equals(other CommandI) bool {
-	otherCmd := other.(*DeleteLagIntfMemberCmdT)
+func (this *DeleteAggIntfMemberCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*DeleteAggIntfMemberCmdT)
 	return this.equals(otherCmd.commandT)
 }
 
-func doLagIntfCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) error {
+func doAggIntfCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) error {
 	if cmd.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
 		return cmd.createErrorAccordingToExecutionState()
 	}
@@ -205,7 +205,7 @@ func doLagIntfCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) err
 		ifname, err = utils.ConvertGoInterfaceIntoString(cmd.changes[0].To)
 	}
 	if err != nil {
-		return nil
+		return err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -231,7 +231,7 @@ func doLagIntfCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) err
 	return nil
 }
 
-func doLagIntfMemberCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) error {
+func doAggIntfMemberCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) error {
 	if cmd.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
 		return cmd.createErrorAccordingToExecutionState()
 	}
@@ -246,13 +246,13 @@ func doLagIntfMemberCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo boo
 		ifname, err = utils.ConvertGoInterfaceIntoString(cmd.changes[0].To)
 	}
 	if err != nil {
-		return nil
+		return err
 	}
 
 	ethIntfs := make([]*interfaces.EthernetIntf, len(cmd.changes))
 	for i, change := range cmd.changes {
 		ethIntfs[i] = &interfaces.EthernetIntf{
-			Ifname: change.Path[LagIntfIfnamePathItemIdxC],
+			Ifname: change.Path[AggIntfIfnamePathItemIdxC],
 		}
 	}
 

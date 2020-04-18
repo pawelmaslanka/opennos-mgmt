@@ -23,6 +23,7 @@ const (
 	VlanModeEthPathItemsCountC          = 5
 	AccessVlanEthPathItemsCountC        = 5
 	NativeVlanEthPathItemsCountC        = 5
+	TrunkVlanEthIdxPathItemIdxC         = 5
 	TrunkVlanEthPathItemsCountC         = 6
 	TrunkVlanEthPathItemsCountIfUpdateC = 7
 
@@ -348,7 +349,7 @@ func doVlanEthIntfCmd(cmd *commandT, mode vlan.Vlan_Mode, isDelete bool, shouldB
 		vid, err = utils.ConvertGoInterfaceIntoUint16(cmd.changes[0].To)
 	}
 	if err != nil {
-		return nil
+		return err
 	}
 
 	ethIntfs := make([]*interfaces.EthernetIntf, len(cmd.changes))

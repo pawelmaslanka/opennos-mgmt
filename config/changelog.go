@@ -2,6 +2,8 @@ package config
 
 import "github.com/r3labs/diff"
 
+type countT uint16
+
 // TODO: Kazda komenda po przeprocesowaniu diff.Change ustawi na true pole 'processed'
 type DiffChangeMgmtT struct {
 	Change    *diff.Change

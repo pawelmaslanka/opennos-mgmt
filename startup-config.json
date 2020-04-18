@@ -104,8 +104,8 @@
         "port": {
           "breakout-mode": {
             "config": {
-              "channel-speed": "SPEED_10GB",
-              "num-channels": 4
+              "channel-speed": "SPEED_100GB",
+              "num-channels": 1
             }
           }
         },
@@ -169,7 +169,7 @@
             "config": {
               "access-vlan": 1,
               "interface-mode": "TRUNK",
-              "native-vlan": 222,
+              "native-vlan": 20,
               "trunk-vlans": [
                 700,
                 800
@@ -235,10 +235,10 @@
                   "address": [
                     {
                       "config": {
-                        "ip": "10.0.10.11",
-                        "prefix-length": 24
+                        "ip": "11.11.11.11",
+                        "prefix-length": 26
                       },
-                      "ip": "10.0.10.11"
+                      "ip": "11.11.11.11"
                     }
                   ]
                 }
@@ -283,20 +283,7 @@
                 "enabled": true,
                 "index": 0
               },
-              "index": 0,
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.12",
-                        "prefix-length": 24
-                      },
-                      "ip": "10.0.10.12"
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
         }
@@ -480,7 +467,7 @@
             "config": {
               "access-vlan": 1,
               "interface-mode": "TRUNK",
-              "native-vlan": 1,
+              "native-vlan": 111,
               "trunk-vlans": [
                 610,
                 605,
@@ -535,9 +522,9 @@
             "config": {
               "access-vlan": 1,
               "interface-mode": "TRUNK",
-              "native-vlan": 1,
               "trunk-vlans": [
-                61
+                70,
+                73
               ]
             }
           }
@@ -554,20 +541,7 @@
                 "enabled": true,
                 "index": 0
               },
-              "index": 0,
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.61",
-                        "prefix-length": 24
-                      },
-                      "ip": "10.0.10.61"
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
         }
@@ -586,7 +560,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 20,
               "interface-mode": "ACCESS",
               "native-vlan": 1,
               "trunk-vlans": [
@@ -607,20 +580,7 @@
                 "enabled": true,
                 "index": 0
               },
-              "index": 0,
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.62",
-                        "prefix-length": 24
-                      },
-                      "ip": "10.0.10.62"
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
         }
@@ -640,11 +600,7 @@
           "switched-vlan": {
             "config": {
               "access-vlan": 1,
-              "interface-mode": "TRUNK",
-              "native-vlan": 1,
-              "trunk-vlans": [
-                63
-              ]
+              "interface-mode": "TRUNK"
             }
           }
         },
@@ -660,20 +616,7 @@
                 "enabled": true,
                 "index": 0
               },
-              "index": 0,
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.63",
-                        "prefix-length": 24
-                      },
-                      "ip": "10.0.10.63"
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
         }
@@ -693,11 +636,7 @@
           "switched-vlan": {
             "config": {
               "access-vlan": 1,
-              "interface-mode": "TRUNK",
-              "native-vlan": 1,
-              "trunk-vlans": [
-                64
-              ]
+              "interface-mode": "TRUNK"
             }
           }
         },
@@ -713,20 +652,7 @@
                 "enabled": true,
                 "index": 0
               },
-              "index": 0,
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.64",
-                        "prefix-length": 24
-                      },
-                      "ip": "10.0.10.64"
-                    }
-                  ]
-                }
-              }
+              "index": 0
             }
           ]
         }
