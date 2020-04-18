@@ -2,6 +2,7 @@ package config
 
 import (
 	"container/list"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"opennos-mgmt/gnmi"
@@ -428,10 +429,12 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 	if err != nil {
 		return err
 	}
+
 	configAction, err := this.findTransConfigActionChange(diffChangelog)
 	if err != nil {
 		return err
 	}
+
 	_, err = this.findTransCommitConfirmTimeoutChange(diffChangelog)
 	if err != nil {
 		return err
@@ -474,8 +477,14 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 	// Deferred DiscardOrFinishTrans() will clean transConfigLookupTbl
 	this.transConfigLookupTbl = nil
 
+	jsonDump, err := json.MarshalIndent(*changelog, "", "    ")
+	if err != nil {
+		log.Errorf("Failed to JSON dump: %s", err)
+		jsonDump = make([]byte, 1)
+		jsonDump[0] = ' '
+	}
 	// It is not really error, we just passing information that we have finished dry running with success
-	return fmt.Errorf("Dry running: requested changes are valid")
+	return fmt.Errorf("\nDry running: requested changes are valid\n%s", string(jsonDump))
 }
 
 func (this *ConfigMngrT) parseChangelogAndConvertToCommands(diffChangelog *DiffChangelogMgmtT) error {
