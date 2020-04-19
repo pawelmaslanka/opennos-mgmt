@@ -177,7 +177,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 1,
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
@@ -229,7 +228,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 1,
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
@@ -280,7 +278,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 1,
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
@@ -332,7 +329,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 1,
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
@@ -383,7 +379,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 1,
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
@@ -433,14 +428,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 1,
-              "interface-mode": "TRUNK",
-              "native-vlan": 1,
-              "trunk-vlans": [
-                610,
-                605,
-                "600..601"
-              ]
             }
           }
         },
@@ -485,7 +472,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 1,
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
@@ -536,11 +522,7 @@
           "switched-vlan": {
             "config": {
               "access-vlan": 20,
-              "interface-mode": "ACCESS",
-              "native-vlan": 1,
-              "trunk-vlans": [
-                62
-              ]
+              "interface-mode": "ACCESS"
             }
           }
         },
@@ -585,7 +567,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 1,
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
@@ -635,7 +616,6 @@
           },
           "switched-vlan": {
             "config": {
-              "access-vlan": 1,
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
