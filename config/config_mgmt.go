@@ -195,9 +195,10 @@ func (this *ConfigMngrT) Confirm() error {
 		return errors.New("Transaction has not been started")
 	}
 
+	candidateConfig := this.transConfirmationCandidateConfig
 	this.configLookupTbl = this.transConfigLookupTbl.makeCopy()
 	this.DiscardOrFinishTrans()
-	return this.CommitCandidateConfig(this.transConfirmationCandidateConfig)
+	return this.CommitCandidateConfig(candidateConfig)
 }
 
 func (this *ConfigMngrT) DiscardOrFinishTrans() error {
