@@ -20,3 +20,4 @@ gnmi/certs/*.srl
 opennos-mgmt
 save-config.json
 startup-config.json
+config/gnmi_session.txt

@@ -20,7 +20,14 @@ type CommandI interface {
 	// GetName returns name of derived command
 	GetName() string
 	// EqualTo checks if 'this' command is equal to another 'cmd'
-	Equals(cmd CommandI) bool
+	Equals(other CommandI) bool
+	// Append extracts internal data of 'other' and attach them to 'this'. After that, 'other'
+	// should not be executed as a separate command due to its internal data are cleaned.
+	// Returns tuple:
+	// true, nil - if 'other' has been successfully appended;
+	// false, nil - if 'other' has not been appended, because particular command does not support this capability;
+	// false, error - if there was an error during appending 'other'
+	Append(other CommandI) (bool, error)
 }
 
 // commandT is desired to embed in derivation type of Command pattern interface for use common
@@ -103,4 +110,68 @@ func (this *commandT) equals(other *commandT) bool {
 	}
 
 	return true
+}
+
+func (this *commandT) append(cmd CommandI) (bool, error) {
+	other, err := getCommandT(cmd)
+	if err != nil {
+		return false, err
+	}
+
+	if this.name != other.name {
+		return false, fmt.Errorf("Requested command to append %q is not the same to %q",
+			other.name, this.name)
+	}
+
+	this.changes = append(this.changes, other.changes...)
+	other.erase()
+	return true, nil
+}
+
+func (this *commandT) erase() {
+	this.ethSwitchMgmt = nil
+	this.name = ""
+	this.changes = nil
+}
+
+func getCommandT(cmd CommandI) (*commandT, error) {
+	var cmdT *commandT
+	switch v := cmd.(type) {
+	case *NilCmdT:
+		cmdT = NilCmdT(*v).commandT
+	case *SetAggIntfCmdT:
+		cmdT = SetAggIntfCmdT(*v).commandT
+	case *DeleteAggIntfCmdT:
+		cmdT = DeleteAggIntfCmdT(*v).commandT
+	case *SetAggIntfMemberCmdT:
+		cmdT = SetAggIntfMemberCmdT(*v).commandT
+	case *DeleteAggIntfMemberCmdT:
+		cmdT = DeleteAggIntfMemberCmdT(*v).commandT
+	case *SetIpv4AddrEthIntfCmdT:
+		cmdT = SetIpv4AddrEthIntfCmdT(*v).commandT
+	case *DeleteIpv4AddrEthIntfCmdT:
+		cmdT = DeleteIpv4AddrEthIntfCmdT(*v).commandT
+	case *SetPortBreakoutCmdT:
+		cmdT = SetPortBreakoutCmdT(*v).commandT
+	case *SetPortBreakoutChanSpeedCmdT:
+		cmdT = SetPortBreakoutChanSpeedCmdT(*v).commandT
+	case *SetVlanModeEthIntfCmdT:
+		cmdT = SetVlanModeEthIntfCmdT(*v).commandT
+	case *SetAccessVlanEthIntfCmdT:
+		cmdT = SetAccessVlanEthIntfCmdT(*v).commandT
+	case *DeleteAccessVlanEthIntfCmdT:
+		cmdT = DeleteAccessVlanEthIntfCmdT(*v).commandT
+	case *SetNativeVlanEthIntfCmdT:
+		cmdT = SetNativeVlanEthIntfCmdT(*v).commandT
+	case *DeleteNativeVlanEthIntfCmdT:
+		cmdT = DeleteNativeVlanEthIntfCmdT(*v).commandT
+	case *SetTrunkVlanEthIntfCmdT:
+		cmdT = SetTrunkVlanEthIntfCmdT(*v).commandT
+	case *DeleteTrunkVlanEthIntfCmdT:
+		cmdT = DeleteTrunkVlanEthIntfCmdT(*v).commandT
+	default:
+		return nil, fmt.Errorf("Cannot convert %v to any of known command, got: %T", v, v)
+	}
+
+	return cmdT, nil
 }

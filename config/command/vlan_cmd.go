@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	mgmt "opennos-eth-switch-service/mgmt"
 	"opennos-eth-switch-service/mgmt/interfaces"
 	"opennos-eth-switch-service/mgmt/vlan"
@@ -81,6 +82,11 @@ func (this *SetVlanModeEthIntfCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
+// Append is not supported
+func (this *SetVlanModeEthIntfCmdT) Append(cmd CommandI) (bool, error) {
+	return false, fmt.Errorf("Unsupported")
+}
+
 func (this *commandT) doSetVlanModeCmd(shouldBeAbleOnlyToUndo bool) error {
 	if this.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
 		return this.createErrorAccordingToExecutionState()
@@ -134,6 +140,11 @@ func (this *SetAccessVlanEthIntfCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *SetAccessVlanEthIntfCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
+}
+
 // DeleteAccessVlanEthIntfCmdT implements command for delete access VLAN from Ethernet Interface
 type DeleteAccessVlanEthIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
@@ -172,6 +183,11 @@ func (this *DeleteAccessVlanEthIntfCmdT) GetName() string {
 func (this *DeleteAccessVlanEthIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*DeleteAccessVlanEthIntfCmdT)
 	return this.equals(otherCmd.commandT)
+}
+
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *DeleteAccessVlanEthIntfCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
 }
 
 // SetNativeVlanEthIntfCmdT implements command for set native VLAN for Ethernet Interface
@@ -214,6 +230,11 @@ func (this *SetNativeVlanEthIntfCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *SetNativeVlanEthIntfCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
+}
+
 // DeleteNativeVlanEthIntfCmdT implements command for delete native VLAN from Ethernet Interface
 type DeleteNativeVlanEthIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
@@ -252,6 +273,11 @@ func (this *DeleteNativeVlanEthIntfCmdT) GetName() string {
 func (this *DeleteNativeVlanEthIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*DeleteNativeVlanEthIntfCmdT)
 	return this.equals(otherCmd.commandT)
+}
+
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *DeleteNativeVlanEthIntfCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
 }
 
 // SetTrunkVlanEthIntfCmdT implements command for set trunk VLAN from Ethernet Interface
@@ -294,6 +320,11 @@ func (this *SetTrunkVlanEthIntfCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *SetTrunkVlanEthIntfCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
+}
+
 // DeleteTrunkVlanEthIntfCmdT implements command for delete trunk VLAN from Ethernet Interface
 type DeleteTrunkVlanEthIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
@@ -332,6 +363,11 @@ func (this *DeleteTrunkVlanEthIntfCmdT) GetName() string {
 func (this *DeleteTrunkVlanEthIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*DeleteTrunkVlanEthIntfCmdT)
 	return this.equals(otherCmd.commandT)
+}
+
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *DeleteTrunkVlanEthIntfCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
 }
 
 func doVlanEthIntfCmd(cmd *commandT, mode vlan.Vlan_Mode, isDelete bool, shouldBeAbleOnlyToUndo bool) error {

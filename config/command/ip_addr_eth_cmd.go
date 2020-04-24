@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	mgmt "opennos-eth-switch-service/mgmt"
 	"opennos-eth-switch-service/mgmt/interfaces"
 	"opennos-mgmt/utils"
@@ -77,6 +78,11 @@ func (this *SetIpv4AddrEthIntfCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
+// Append is not supported
+func (this *SetIpv4AddrEthIntfCmdT) Append(cmd CommandI) (bool, error) {
+	return false, fmt.Errorf("Unsupported")
+}
+
 // DeleteIpv4AddrEthIntfCmdT implements command for deleting IPv4 address from Ethernet Interface
 type DeleteIpv4AddrEthIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
@@ -116,6 +122,11 @@ func (this *DeleteIpv4AddrEthIntfCmdT) GetName() string {
 func (this *DeleteIpv4AddrEthIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*DeleteIpv4AddrEthIntfCmdT)
 	return this.equals(otherCmd.commandT)
+}
+
+// Append is not supported
+func (this *DeleteIpv4AddrEthIntfCmdT) Append(cmd CommandI) (bool, error) {
+	return false, fmt.Errorf("Unsupported")
 }
 
 func doIpv4AddrCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) error {

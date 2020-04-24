@@ -111,6 +111,7 @@ func newConfigLookupTables() *configLookupTablesT {
 }
 
 func (this *configLookupTablesT) checkDependenciesForSetAggIntfMember(aggIfname string, ifname string) error {
+	// TODO: Check if all dependencies from ifname is removed! Should be the same like for port breakout?
 	intfIdx, exists := this.idxByEthIfname[ifname]
 	if !exists {
 		return fmt.Errorf("Ethernet interface %s does not exists", ifname)
@@ -532,7 +533,13 @@ func (this *configLookupTablesT) checkDependenciesForDeleteTrunkVlanFromEthIntf(
 	var err error
 	strBuilder := strings.Builder{}
 	intfIdx := this.idxByEthIfname[ifname]
-	if _, exists := this.vlanTrunkByEth[intfIdx]; !exists {
+	vlans, exists := this.vlanTrunkByEth[intfIdx]
+	if !exists {
+		msg := fmt.Sprintf("There is not any trunk VLAN configured on Ethernet interface %s", ifname)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	} else if !vlans.Has(deleteVid) {
 		msg := fmt.Sprintf("Trunk VLAN %d is not configured on Ethernet interface %s", deleteVid, ifname)
 		if _, err = strBuilder.WriteString(msg); err != nil {
 			return err
@@ -734,11 +741,15 @@ func (this *configLookupTablesT) deleteTrunkVlanEthIntf(ifname string, vidDelete
 	}
 
 	vlans, exists := this.vlanTrunkByEth[intfIdx]
+	if !exists {
+		return fmt.Errorf("There is not configured any trunk VLAN on Ethernet interface %s", ifname)
+	}
+
 	if !vlans.Has(vidDelete) {
 		return fmt.Errorf("There is not configured trunk VLAN %d", vidDelete)
 	}
 
-	delete(this.vlanTrunkByEth, intfIdx)
+	vlans.Delete(vidDelete)
 	this.ethByVlanTrunk[vidDelete].Delete(intfIdx)
 	log.Infof("Deleted trunk VLAN %d from Ethernet interface %s", vidDelete, ifname)
 	return nil

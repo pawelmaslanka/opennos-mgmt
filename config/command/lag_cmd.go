@@ -2,6 +2,7 @@ package command
 
 import (
 	"context"
+	"fmt"
 	mgmt "opennos-eth-switch-service/mgmt"
 	"opennos-eth-switch-service/mgmt/interfaces"
 	"opennos-mgmt/utils"
@@ -70,6 +71,11 @@ func (this *SetAggIntfCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
+// Append is not supported
+func (this *SetAggIntfCmdT) Append(cmd CommandI) (bool, error) {
+	return false, fmt.Errorf("Unsupported")
+}
+
 // DeleteAggIntfCmdT implements command for deletion of LAG interface
 type DeleteAggIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
@@ -108,6 +114,11 @@ func (this *DeleteAggIntfCmdT) GetName() string {
 func (this *DeleteAggIntfCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*DeleteAggIntfCmdT)
 	return this.equals(otherCmd.commandT)
+}
+
+// Append is not supported
+func (this *DeleteAggIntfCmdT) Append(cmd CommandI) (bool, error) {
+	return false, fmt.Errorf("Unsupported")
 }
 
 // SetAggIntfMemberCmdT implements command for add Ethernet interface to LAG
@@ -150,6 +161,11 @@ func (this *SetAggIntfMemberCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *SetAggIntfMemberCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
+}
+
 // DeleteAggIntfMemberCmdT implements command for remove Ethernet interface from LAG
 type DeleteAggIntfMemberCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
@@ -188,6 +204,11 @@ func (this *DeleteAggIntfMemberCmdT) GetName() string {
 func (this *DeleteAggIntfMemberCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*DeleteAggIntfMemberCmdT)
 	return this.equals(otherCmd.commandT)
+}
+
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *DeleteAggIntfMemberCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
 }
 
 func doAggIntfCmd(cmd *commandT, isDelete bool, shouldBeAbleOnlyToUndo bool) error {

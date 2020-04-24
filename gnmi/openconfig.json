@@ -231,7 +231,7 @@
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
-                "200..202"
+                202
               ]
             }
           }
@@ -281,8 +281,8 @@
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
-                "300..301",
-                "333..334"
+                301,
+                334
               ]
             }
           }
@@ -382,7 +382,7 @@
               "interface-mode": "TRUNK",
               "native-vlan": 1,
               "trunk-vlans": [
-                "500..505"
+                505
               ]
             }
           }

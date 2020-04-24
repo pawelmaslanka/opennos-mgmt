@@ -11,6 +11,11 @@ import (
 	"github.com/r3labs/diff"
 )
 
+const (
+	idSetAggIntfMemberNameFmt    = "sm-%s"
+	idDeleteAggIntfMemberNameFmt = "sm-%s"
+)
+
 func isChangedAggIntfMember(change *diff.Change) bool {
 	if len(change.Path) != cmd.AggIntfMemberPathItemsCountC {
 		return false
@@ -54,7 +59,8 @@ func (this *ConfigMngrT) validateSetAggIntfMemberChange(changeItem *DiffChangeMg
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransaction(ifname, setAggIntfMemberCmd, setAggIntfMemberC); err != nil {
+		id := fmt.Sprintf(idSetAggIntfMemberNameFmt, aggIfname)
+		if err := this.appendCmdToTransaction(id, setAggIntfMemberCmd, setAggIntfMemberC); err != nil {
 			return err
 		}
 	}
@@ -108,7 +114,8 @@ func (this *ConfigMngrT) validateDeleteAggIntfMemberChange(changeItem *DiffChang
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransaction(ifname, deleteAggIntfMemberCmd, deleteAggIntfMemberC); err != nil {
+		id := fmt.Sprintf(idDeleteAggIntfMemberNameFmt, aggIfname)
+		if err := this.appendCmdToTransaction(id, deleteAggIntfMemberCmd, deleteAggIntfMemberC); err != nil {
 			return err
 		}
 	}
@@ -358,7 +365,8 @@ func (this *ConfigMngrT) setAggIntfMember(device *oc.Device) error {
 			change.Path[cmd.AggIntfMemberAggIdPathItemIdxC] = cmd.AggIntfMemberAggIdPathItemC
 
 			command := cmd.NewSetAggIntfMemberCmdT(&change, this.ethSwitchMgmtClient)
-			if err = this.appendCmdToTransaction(aggIfname, command, setAggIntfMemberC); err != nil {
+			id := fmt.Sprintf(idSetAggIntfMemberNameFmt, aggIfname)
+			if err = this.appendCmdToTransaction(id, command, setAggIntfMemberC); err != nil {
 				return err
 			}
 		}

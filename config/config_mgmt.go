@@ -88,16 +88,16 @@ const (
 	startupConfigFilenameC = "startup-config.json"
 )
 
-type cmdByIfnameT map[string]cmd.CommandI
+type cmdByNameT map[string]cmd.CommandI
 
 // ConfigMngrT is responisble for management of device configuration
 type ConfigMngrT struct {
 	configLookupTbl         *configLookupTablesT
 	runningConfig           ygot.ValidatedGoStruct
-	cmdByIfname             [maxNumberOfActionsInTransactionC]cmdByIfnameT
+	cmdByName               [maxNumberOfActionsInTransactionC]cmdByNameT
 	ethSwitchMgmtClientConn *grpc.ClientConn
 	ethSwitchMgmtClient     *mgmt.EthSwitchMgmtClient
-	// transactions    [TransactionIdx][maxNumberOfActionsInTransactionC]cmdByIfnameT
+	// transactions    [TransactionIdx][maxNumberOfActionsInTransactionC]cmdByNameT
 	// transConfigLookupTbl every queued command should remove dependency from here
 	// e.g. when LAG is going to be remove, we should remove ports from this LAG, and LAG itself
 	transConfigLookupTbl             *configLookupTablesT
@@ -130,8 +130,8 @@ func (this *ConfigMngrT) NewTransaction() error {
 	// TODO: Check if it is still required?
 	var i OrdinalNumberT
 	for i = 0; i < maxNumberOfActionsInTransactionC; i++ {
-		this.cmdByIfname[i] = make(cmdByIfnameT, 1)
-		this.cmdByIfname[i][nilCmd.GetName()] = nilCmd
+		this.cmdByName[i] = make(cmdByNameT, 1)
+		this.cmdByName[i][nilCmd.GetName()] = nilCmd
 	}
 
 	this.transConfigLookupTbl = this.configLookupTbl.makeCopy()
@@ -387,18 +387,29 @@ func isPortSplitted(device *oc.Device, ethIfname string) bool {
 	return false
 }
 
-func (this *ConfigMngrT) appendCmdToTransaction(ifname string, cmdAdd cmd.CommandI, idx OrdinalNumberT) error {
-	cmds := this.cmdByIfname[idx]
+func (this *ConfigMngrT) appendCmdToTransaction(idName string, cmdAdd cmd.CommandI, idx OrdinalNumberT) error {
+	cmds := this.cmdByName[idx]
 	for _, command := range cmds {
 		if command.Equals(cmdAdd) {
 			return fmt.Errorf("Command %q already exists in transaction", command.GetName())
 		}
 	}
 
-	log.Infof("Append command %q to transaction", cmdAdd.GetName())
+	log.Infof("Command %q", cmdAdd.GetName())
 
-	cmds[ifname] = cmdAdd
+	if cmd, exists := cmds[idName]; exists {
+		if ok, err := cmd.Append(cmdAdd); err != nil {
+			return err
+		} else if ok {
+			log.Infof("Appended to transaction")
+			return nil
+		}
+	}
+
+	cmds[idName] = cmdAdd
 	this.addCmdToListTrans(cmdAdd)
+	log.Infof("Added to transaction")
+
 	return nil
 }
 

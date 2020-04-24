@@ -78,6 +78,11 @@ func (this *SetPortBreakoutCmdT) Equals(other CommandI) bool {
 	return this.equals(otherCmd.commandT)
 }
 
+// Append is not supported
+func (this *SetPortBreakoutCmdT) Append(cmd CommandI) (bool, error) {
+	return false, fmt.Errorf("Unsupported")
+}
+
 // SetPortBreakoutChanSpeedCmdT implements command for change speed onto all sub-ports
 type SetPortBreakoutChanSpeedCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
@@ -115,6 +120,11 @@ func (this *SetPortBreakoutChanSpeedCmdT) GetName() string {
 func (this *SetPortBreakoutChanSpeedCmdT) Equals(other CommandI) bool {
 	otherCmd := other.(*SetPortBreakoutChanSpeedCmdT)
 	return this.equals(otherCmd.commandT)
+}
+
+// Append is not supported
+func (this *SetPortBreakoutChanSpeedCmdT) Append(cmd CommandI) (bool, error) {
+	return false, fmt.Errorf("Unsupported")
 }
 
 // No exported section
