@@ -3,11 +3,11 @@ package config
 import (
 	"container/list"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"opennos-mgmt/gnmi"
 	"opennos-mgmt/gnmi/modeldata/oc"
+	"opennos-mgmt/utils"
 	"strings"
 	"time"
 
@@ -494,11 +494,18 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 		return err
 	}
 
-	jsonChangelog, err := json.MarshalIndent(*changelog, "", "    ")
+	rawRunningConfig, err := gnmi.ConvertYgotGoStructIntoJsonByteStream(this.runningConfig)
 	if err != nil {
-		log.Errorf("Failed to JSON dump: %s", err)
-		jsonChangelog = make([]byte, 1)
-		jsonChangelog[0] = ' '
+		return err
+	}
+	rawCandidateConfig, err := gnmi.ConvertYgotGoStructIntoJsonByteStream(*candidateConfig)
+	if err != nil {
+		return err
+	}
+
+	configJsonDiff, err := utils.GetJsonDiff(rawRunningConfig, rawCandidateConfig)
+	if err != nil {
+		return err
 	}
 
 	if configAction == oc.OpenconfigManagement_TRANS_TYPE_TRANS_COMMIT_CONFIRM {
@@ -509,8 +516,9 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 		this.transConfirmationCandidateConfig = candidateConfig
 		this.transConfirmationTimeoutCtx, this.transConfirmationCancel = context.WithCancel(context.Background())
 		go this.startCountingForConfirmationTimeout(&this.transConfirmationTimeoutCtx, commitConfirmTimeout)
+
 		return fmt.Errorf("\nWaiting %d seconds for confirmation changes\n%s",
-			commitConfirmTimeout, string(jsonChangelog))
+			commitConfirmTimeout, configJsonDiff)
 	}
 
 	defer this.DiscardOrFinishTrans()
@@ -528,9 +536,8 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 
 	// Deferred DiscardOrFinishTrans() will clean transConfigLookupTbl
 	this.transConfigLookupTbl = nil
-
 	// It is not really error, we just passing information that we have finished dry running with success
-	return fmt.Errorf("\nDry running: requested changes are valid\n%s", string(jsonChangelog))
+	return fmt.Errorf("\nDry running: requested changes are valid\n%s", configJsonDiff)
 }
 
 func (this *ConfigMngrT) parseChangelogAndConvertToCommands(diffChangelog *DiffChangelogMgmtT) error {

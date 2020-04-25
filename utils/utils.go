@@ -2,6 +2,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"opennos-mgmt/gnmi/modeldata/oc"
@@ -10,6 +11,9 @@ import (
 	"github.com/kylelemons/godebug/pretty"
 
 	lib "golibext"
+
+	diff "github.com/yudai/gojsondiff"
+	"github.com/yudai/gojsondiff/formatter"
 )
 
 var (
@@ -80,4 +84,41 @@ func ConvertGoInterfaceIntoUint8(value interface{}) (uint8, error) {
 	}
 
 	return rv, nil
+}
+
+func GetJsonDiff(a []byte, b []byte) (string, error) {
+	differ := diff.New()
+	d, err := differ.Compare(a, b)
+	if err != nil {
+		return "", fmt.Errorf("Failed to unmarshal file: %s", err.Error())
+	}
+
+	var diffString string
+	// Output the result
+	if d.Modified() {
+		format := "ascii"
+		if format == "ascii" {
+			var aJson map[string]interface{}
+			json.Unmarshal(a, &aJson)
+
+			config := formatter.AsciiFormatterConfig{
+				ShowArrayIndex: false,
+				Coloring:       false,
+			}
+
+			formatter := formatter.NewAsciiFormatter(aJson, config)
+			diffString, err = formatter.Format(d)
+			if err != nil {
+				// No error can occur
+			}
+		} else if format == "delta" {
+			formatter := formatter.NewDeltaFormatter()
+			diffString, err = formatter.Format(d)
+			if err != nil {
+				// No error can occur
+			}
+		}
+	}
+
+	return diffString, nil
 }

@@ -112,16 +112,16 @@ func getKeyedListEntry(node map[string]interface{}, elem *pb.PathElem, createIfN
 	return m
 }
 
-func SaveConfigFile(config ygot.ValidatedGoStruct, filename string) error {
+func ConvertYgotGoStructIntoJsonByteStream(ygotStruct ygot.ValidatedGoStruct) ([]byte, error) {
 	model := NewModel(modeldata.ModelData,
 		reflect.TypeOf((*oc.Device)(nil)),
 		oc.SchemaTree["Device"],
 		oc.Unmarshal,
 		oc.ΛEnum)
 	nilPath := &gnmi.Path{}
-	node, stat := ygotutils.GetNode(model.schemaTreeRoot, config, nilPath)
+	node, stat := ygotutils.GetNode(model.schemaTreeRoot, ygotStruct, nilPath)
 	if isNil(node) || stat.GetCode() != int32(cpb.Code_OK) {
-		return status.Errorf(codes.NotFound, "root path not found")
+		return nil, status.Errorf(codes.NotFound, "root path not found")
 	}
 
 	nodeStruct, _ := node.(ygot.GoStruct)
@@ -135,20 +135,25 @@ func SaveConfigFile(config ygot.ValidatedGoStruct, filename string) error {
 	if err != nil {
 		msg := fmt.Sprintf("error in constructing %s JSON tree from requested node: %v", jsonType, err)
 		log.Error(msg)
-		return status.Error(codes.Internal, msg)
+		return nil, status.Error(codes.Internal, msg)
 	}
 
-	// TODO: Check if exists "config-action". Add ACL for deletion of management/transaction/default-config-action
-	// Skip store "management" configuration in config file
-	// delete((jsonTree["management"].(map[string]interface{}))["transaction"].(map[string]interface{}), "config-action") // No problem if "management" isn't in the map
 	stripMgmtTransConfigAction(jsonTree)
 	jsonDump, err := json.MarshalIndent(jsonTree, "", "  ")
 	if err != nil {
 		msg := fmt.Sprintf("error in marshaling %s JSON tree to bytes: %v", jsonType, err)
 		log.Error(msg)
-		return status.Error(codes.Internal, msg)
+		return nil, status.Error(codes.Internal, msg)
 	}
 
+	return jsonDump, nil
+}
+
+func SaveConfigFile(config ygot.ValidatedGoStruct, filename string) error {
+	jsonDump, err := ConvertYgotGoStructIntoJsonByteStream(config)
+	if err != nil {
+		return err
+	}
 	// If the file doesn't exist, create it, or append to the file
 	file, err := os.OpenFile(filename, os.O_TRUNC|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
