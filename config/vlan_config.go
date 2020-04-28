@@ -224,7 +224,7 @@ func (this *ConfigMngrT) validateSetVlanModeEthIntfChange(changeItem *DiffChange
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransaction(ifname, setVlanModeEthIntfCmd, setVlanModeForEthIntfC); err != nil {
+		if err := this.appendCmdToTransaction(ifname, setVlanModeEthIntfCmd, setVlanModeForEthIntfC, false); err != nil {
 			return err
 		}
 	}
@@ -276,7 +276,7 @@ func (this *ConfigMngrT) validateSetAccessVlanEthIntfChange(changeItem *DiffChan
 
 	if this.transHasBeenStarted {
 		id := fmt.Sprintf(idSetAccessVlanNameFmt, vid)
-		if err := this.appendCmdToTransaction(id, setAccessVlanEthIntfCmd, setAccessVlanForEthIntfC); err != nil {
+		if err := this.appendCmdToTransaction(id, setAccessVlanEthIntfCmd, setAccessVlanForEthIntfC, false); err != nil {
 			return err
 		}
 	}
@@ -326,7 +326,7 @@ func (this *ConfigMngrT) validateDeleteAccessVlanEthIntfChange(changeItem *DiffC
 
 	if this.transHasBeenStarted {
 		id := fmt.Sprintf(idDeleteAccessVlanNameFmt, vid)
-		if err = this.appendCmdToTransaction(id, deleteAccessVlanEthIntfCmd, deleteEthIntfFromAccessVlanC); err != nil {
+		if err = this.appendCmdToTransaction(id, deleteAccessVlanEthIntfCmd, deleteEthIntfFromAccessVlanC, false); err != nil {
 			return err
 		}
 	}
@@ -382,7 +382,7 @@ func (this *ConfigMngrT) validateSetNativeVlanEthIntfChange(changeItem *DiffChan
 
 	if this.transHasBeenStarted {
 		id := fmt.Sprintf(idSetNativeVlanNameFmt, vid)
-		if err := this.appendCmdToTransaction(id, setNativeVlanEthIntfCmd, setNativeVlanForEthIntfC); err != nil {
+		if err = this.appendCmdToTransaction(id, setNativeVlanEthIntfCmd, setNativeVlanForEthIntfC, false); err != nil {
 			return err
 		}
 	}
@@ -432,7 +432,7 @@ func (this *ConfigMngrT) validateDeleteNativeVlanEthIntfChange(changeItem *DiffC
 
 	if this.transHasBeenStarted {
 		id := fmt.Sprintf(idDeleteNativeVlanNameFmt, vid)
-		if err = this.appendCmdToTransaction(id, deleteNativeVlanEthIntfCmd, deleteEthIntfFromNativeVlanC); err != nil {
+		if err = this.appendCmdToTransaction(id, deleteNativeVlanEthIntfCmd, deleteEthIntfFromNativeVlanC, false); err != nil {
 			return err
 		}
 	}
@@ -488,7 +488,7 @@ func (this *ConfigMngrT) validateSetTrunkVlanEthIntfChange(changeItem *DiffChang
 
 	if this.transHasBeenStarted {
 		id := fmt.Sprintf(idSetTrunkVlanNameFmt, vid)
-		if err = this.appendCmdToTransaction(id, setTrunkVlanEthIntfCmd, setTrunkVlanForEthIntfC); err != nil {
+		if err = this.appendCmdToTransaction(id, setTrunkVlanEthIntfCmd, setTrunkVlanForEthIntfC, false); err != nil {
 			return err
 		}
 	}
@@ -543,7 +543,7 @@ func (this *ConfigMngrT) validateDeleteTrunkVlanEthIntfChange(changeItem *DiffCh
 
 	if this.transHasBeenStarted {
 		id := fmt.Sprintf(idDeleteTrunkVlanNameFmt, vid)
-		if err = this.appendCmdToTransaction(id, deleteTrunkVlanEthIntfCmd, deleteEthIntfFromTrunkVlanC); err != nil {
+		if err = this.appendCmdToTransaction(id, deleteTrunkVlanEthIntfCmd, deleteEthIntfFromTrunkVlanC, false); err != nil {
 			return err
 		}
 	}
@@ -729,7 +729,7 @@ func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
 		modeChange.Path[cmd.VlanEthVlanModePathItemIdxC] = cmd.VlanEthVlanModePathItemC
 
 		vlanModeCmd := cmd.NewSetVlanModeEthIntfCmdT(&modeChange, this.ethSwitchMgmtClient)
-		if err = this.appendCmdToTransaction(ethIfname, vlanModeCmd, setVlanModeForEthIntfC); err != nil {
+		if err = this.appendCmdToTransaction(ethIfname, vlanModeCmd, setVlanModeForEthIntfC, true); err != nil {
 			return err
 		}
 
@@ -749,7 +749,7 @@ func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
 
 				accessVlanCmd := cmd.NewSetAccessVlanEthIntfCmdT(&accessChange, this.ethSwitchMgmtClient)
 				id := fmt.Sprintf(idSetAccessVlanNameFmt, accessVlan)
-				if err = this.appendCmdToTransaction(id, accessVlanCmd, setAccessVlanForEthIntfC); err != nil {
+				if err = this.appendCmdToTransaction(id, accessVlanCmd, setAccessVlanForEthIntfC, true); err != nil {
 					return err
 				}
 			}
@@ -769,7 +769,7 @@ func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
 
 				nativeVlanCmd := cmd.NewSetNativeVlanEthIntfCmdT(&nativeChange, this.ethSwitchMgmtClient)
 				id := fmt.Sprintf(idSetNativeVlanNameFmt, nativeVlan)
-				if err = this.appendCmdToTransaction(id, nativeVlanCmd, setNativeVlanForEthIntfC); err != nil {
+				if err = this.appendCmdToTransaction(id, nativeVlanCmd, setNativeVlanForEthIntfC, true); err != nil {
 					return err
 				}
 			}
@@ -789,7 +789,7 @@ func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
 
 				trunkVlanCmd := cmd.NewSetTrunkVlanEthIntfCmdT(&trunkChange, this.ethSwitchMgmtClient)
 				id := fmt.Sprintf(idSetTrunkVlanNameFmt, trunkVlan)
-				if err = this.appendCmdToTransaction(id, trunkVlanCmd, setTrunkVlanForEthIntfC); err != nil {
+				if err = this.appendCmdToTransaction(id, trunkVlanCmd, setTrunkVlanForEthIntfC, true); err != nil {
 					return err
 				}
 			}

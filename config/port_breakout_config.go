@@ -162,7 +162,7 @@ func (this *ConfigMngrT) validatePortBreakoutChannSpeedChange(ch *DiffChangeMgmt
 
 	if this.transHasBeenStarted {
 		setPortBreakoutChanSpeedCmd := cmd.NewSetPortBreakoutChanSpeedCmdT(ch.Change, this.ethSwitchMgmtClient)
-		if err := this.appendCmdToTransaction(ifname, setPortBreakoutChanSpeedCmd, setPortBreakoutChanSpeedC); err != nil {
+		if err := this.appendCmdToTransaction(ifname, setPortBreakoutChanSpeedCmd, setPortBreakoutChanSpeedC, false); err != nil {
 			return err
 		}
 	}
@@ -272,7 +272,7 @@ func (this *ConfigMngrT) validatePortBreakoutChange(changedItem *DiffChangeMgmtT
 
 	if this.transHasBeenStarted {
 		setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
-		if err = this.appendCmdToTransaction(ifname, setPortBreakoutCmd, setPortBreakoutC); err != nil {
+		if err = this.appendCmdToTransaction(ifname, setPortBreakoutCmd, setPortBreakoutC, false); err != nil {
 			return err
 		}
 	}
@@ -422,7 +422,7 @@ func (this *ConfigMngrT) setPortBreakout(device *oc.Device) error {
 		chanSpeedChange.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] = cmd.PortBreakoutChanSpeedPathItemC
 
 		command := cmd.NewSetPortBreakoutCmdT(&numChanChange, &chanSpeedChange, this.ethSwitchMgmtClient)
-		if err = this.appendCmdToTransaction(ethIfname, command, setPortBreakoutC); err != nil {
+		if err = this.appendCmdToTransaction(ethIfname, command, setPortBreakoutC, false); err != nil {
 			return err
 		}
 	}

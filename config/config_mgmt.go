@@ -387,7 +387,7 @@ func isPortSplitted(device *oc.Device, ethIfname string) bool {
 	return false
 }
 
-func (this *ConfigMngrT) appendCmdToTransaction(idName string, cmdAdd cmd.CommandI, idx OrdinalNumberT) error {
+func (this *ConfigMngrT) appendCmdToTransaction(idName string, cmdAdd cmd.CommandI, idx OrdinalNumberT, shouldBeMerged bool) error {
 	cmds := this.cmdByName[idx]
 	for _, command := range cmds {
 		if command.Equals(cmdAdd) {
@@ -395,14 +395,19 @@ func (this *ConfigMngrT) appendCmdToTransaction(idName string, cmdAdd cmd.Comman
 		}
 	}
 
-	log.Infof("Command %q", cmdAdd.GetName())
+	log.Infof("%s: Command %q and shoutld be in batch - %v", idName, cmdAdd.GetName(), shouldBeMerged)
 
-	if cmd, exists := cmds[idName]; exists {
-		if ok, err := cmd.Append(cmdAdd); err != nil {
-			return err
-		} else if ok {
-			log.Infof("Appended to transaction")
-			return nil
+	if shouldBeMerged {
+		if cmd, exists := cmds[idName]; exists {
+			log.Infof("Already exists")
+			if ok, err := cmd.Append(cmdAdd); err != nil {
+				return err
+			} else if ok {
+				log.Infof("Appended to transaction")
+				return nil
+			}
+		} else {
+			log.Infof("Not exists")
 		}
 	}
 

@@ -237,7 +237,7 @@ func (this *ConfigMngrT) validateSetIpv4AddrEthIntf(changeItem *DiffChangeMgmtT,
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendCmdToTransaction(ifname, setIpv4AddrEthIntfCmd, setIpv4AddrForEthIntfC); err != nil {
+		if err = this.appendCmdToTransaction(ifname, setIpv4AddrEthIntfCmd, setIpv4AddrForEthIntfC, false); err != nil {
 			return err
 		}
 	}
@@ -290,7 +290,7 @@ func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgm
 	}
 
 	if this.transHasBeenStarted {
-		if err = this.appendCmdToTransaction(ifname, deleteIpv4AddrEthIntfCmd, deleteIpv4AddrFromEthIntfC); err != nil {
+		if err = this.appendCmdToTransaction(ifname, deleteIpv4AddrEthIntfCmd, deleteIpv4AddrFromEthIntfC, false); err != nil {
 			return err
 		}
 	}
@@ -387,7 +387,7 @@ func (this *ConfigMngrT) setIpv4AddrEthIntf(device *oc.Device) error {
 			prfxLenChange.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemC
 
 			command := cmd.NewSetIpv4AddrEthIntfCmdT(&ipChange, &prfxLenChange, this.ethSwitchMgmtClient)
-			if err = this.appendCmdToTransaction(ethIfname, command, setIpv4AddrForEthIntfC); err != nil {
+			if err = this.appendCmdToTransaction(ethIfname, command, setIpv4AddrForEthIntfC, true); err != nil {
 				return err
 			}
 		}

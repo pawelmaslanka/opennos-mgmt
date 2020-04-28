@@ -60,7 +60,7 @@ func (this *ConfigMngrT) validateSetAggIntfMemberChange(changeItem *DiffChangeMg
 
 	if this.transHasBeenStarted {
 		id := fmt.Sprintf(idSetAggIntfMemberNameFmt, aggIfname)
-		if err := this.appendCmdToTransaction(id, setAggIntfMemberCmd, setAggIntfMemberC); err != nil {
+		if err := this.appendCmdToTransaction(id, setAggIntfMemberCmd, setAggIntfMemberC, false); err != nil {
 			return err
 		}
 	}
@@ -115,7 +115,7 @@ func (this *ConfigMngrT) validateDeleteAggIntfMemberChange(changeItem *DiffChang
 
 	if this.transHasBeenStarted {
 		id := fmt.Sprintf(idDeleteAggIntfMemberNameFmt, aggIfname)
-		if err := this.appendCmdToTransaction(id, deleteAggIntfMemberCmd, deleteAggIntfMemberC); err != nil {
+		if err := this.appendCmdToTransaction(id, deleteAggIntfMemberCmd, deleteAggIntfMemberC, false); err != nil {
 			return err
 		}
 	}
@@ -147,7 +147,7 @@ func (this *ConfigMngrT) validateSetAggIntfChange(changeItem *DiffChangeMgmtT, c
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransaction(aggIfname, setAggIntfCmd, setAggIntfC); err != nil {
+		if err := this.appendCmdToTransaction(aggIfname, setAggIntfCmd, setAggIntfC, false); err != nil {
 			return err
 		}
 	}
@@ -175,7 +175,7 @@ func (this *ConfigMngrT) validateDeleteAggIntfChange(changeItem *DiffChangeMgmtT
 	}
 
 	if this.transHasBeenStarted {
-		if err := this.appendCmdToTransaction(aggIfname, deleteAggIntfCmd, deleteAggIntfC); err != nil {
+		if err := this.appendCmdToTransaction(aggIfname, deleteAggIntfCmd, deleteAggIntfC, false); err != nil {
 			return err
 		}
 	}
@@ -342,7 +342,7 @@ func (this *ConfigMngrT) setAggIntf(device *oc.Device) error {
 		change.Path[cmd.AggIntfNamePathItemIdxC] = cmd.AggIntfNamePathItemC
 
 		command := cmd.NewSetAggIntfCmdT(&change, this.ethSwitchMgmtClient)
-		if err = this.appendCmdToTransaction(aggIfname, command, setAggIntfC); err != nil {
+		if err = this.appendCmdToTransaction(aggIfname, command, setAggIntfC, true); err != nil {
 			return err
 		}
 	}
@@ -366,7 +366,7 @@ func (this *ConfigMngrT) setAggIntfMember(device *oc.Device) error {
 
 			command := cmd.NewSetAggIntfMemberCmdT(&change, this.ethSwitchMgmtClient)
 			id := fmt.Sprintf(idSetAggIntfMemberNameFmt, aggIfname)
-			if err = this.appendCmdToTransaction(id, command, setAggIntfMemberC); err != nil {
+			if err = this.appendCmdToTransaction(id, command, setAggIntfMemberC, true); err != nil {
 				return err
 			}
 		}
