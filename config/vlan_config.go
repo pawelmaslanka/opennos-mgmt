@@ -13,6 +13,8 @@ import (
 )
 
 const (
+	idSetVlanNameFmt          = "sv-%d"
+	idDeleteVlanNameFmt       = "dv-%d"
 	idSetAccessVlanNameFmt    = "sav-%d"
 	idDeleteAccessVlanNameFmt = "dav-%d"
 	idSetNativeVlanNameFmt    = "snv-%d"
@@ -20,6 +22,127 @@ const (
 	idSetTrunkVlanNameFmt     = "stv-%d"
 	idDeleteTrunkVlanNameFmt  = "stv-%d"
 )
+
+func extractVlanRelatedParametersFromEthIntf(ifname string, ethIntf *oc.Interface_Ethernet) ([]diff.Change, error) {
+	changes := make([]diff.Change, 0)
+	swVlan := ethIntf.GetSwitchedVlan()
+	if swVlan == nil {
+		return changes, nil
+	}
+
+	if vlanMode := swVlan.GetInterfaceMode(); vlanMode != oc.OpenconfigVlan_VlanModeType_UNSET {
+		changes = append(changes, *createVlanModeDiffChange(ifname, vlanMode))
+	}
+
+	if accessVlan := swVlan.GetAccessVlan(); accessVlan != 0 { // 0 is incorrect VLAN ID
+		changes = append(changes, *createAccessVlanDiffChange(ifname, accessVlan))
+	}
+
+	if nativeVlan := swVlan.GetNativeVlan(); nativeVlan != 0 { // 0 is incorrect VLAN ID
+		changes = append(changes, *createAccessVlanDiffChange(ifname, nativeVlan))
+	}
+
+	if trunkVlans := swVlan.GetTrunkVlans(); len(trunkVlans) > 0 {
+		newChanges, err := createTrunkVlansDiffChange(ifname, trunkVlans)
+		if err != nil {
+			return nil, err
+		}
+
+		changes = append(changes, newChanges...)
+	}
+
+	return changes, nil
+}
+
+func createVlanModeDiffChange(ifname string, vlanMode oc.E_OpenconfigVlan_VlanModeType) *diff.Change {
+	var ch diff.Change
+	ch.Type = diff.CREATE
+	ch.From = nil
+	ch.To = vlanMode
+	ch.Path = make([]string, cmd.VlanModeEthPathItemsCountC)
+	ch.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
+	ch.Path[cmd.VlanEthIfnamePathItemIdxC] = ifname
+	ch.Path[cmd.VlanEthEthernetPathItemIdxC] = cmd.VlanEthEthernetPathItemC
+	ch.Path[cmd.VlanEthSwVlanPathItemIdxC] = cmd.VlanEthSwVlanPathItemC
+	ch.Path[cmd.VlanEthVlanModePathItemIdxC] = cmd.VlanEthVlanModePathItemC
+
+	return &ch
+}
+
+func createAccessVlanDiffChange(ifname string, vid uint16) *diff.Change {
+	var ch diff.Change
+	ch.Type = diff.CREATE
+	ch.From = nil
+	ch.To = vid
+	ch.Path = make([]string, cmd.AccessVlanEthPathItemsCountC)
+	ch.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
+	ch.Path[cmd.VlanEthIfnamePathItemIdxC] = ifname
+	ch.Path[cmd.VlanEthEthernetPathItemIdxC] = cmd.VlanEthEthernetPathItemC
+	ch.Path[cmd.VlanEthSwVlanPathItemIdxC] = cmd.VlanEthSwVlanPathItemC
+	ch.Path[cmd.VlanEthAccessVlanPathItemIdxC] = cmd.VlanEthAccessVlanPathItemC
+
+	return &ch
+}
+
+func createNativeVlanDiffChange(ifname string, vid uint16) *diff.Change {
+	var ch diff.Change
+	ch.Type = diff.CREATE
+	ch.From = nil
+	ch.To = vid
+	ch.Path = make([]string, cmd.NativeVlanEthPathItemsCountC)
+	ch.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
+	ch.Path[cmd.VlanEthIfnamePathItemIdxC] = ifname
+	ch.Path[cmd.VlanEthEthernetPathItemIdxC] = cmd.VlanEthEthernetPathItemC
+	ch.Path[cmd.VlanEthSwVlanPathItemIdxC] = cmd.VlanEthSwVlanPathItemC
+	ch.Path[cmd.VlanEthNativeVlanPathItemIdxC] = cmd.VlanEthNativeVlanPathItemC
+
+	return &ch
+}
+
+func createTrunkVlansDiffChange(ifname string, vids []oc.Interface_Ethernet_SwitchedVlan_TrunkVlans_Union) ([]diff.Change, error) {
+	vlans := make([]uint16, 0)
+	for _, vid := range vids {
+		switch v := vid.(type) {
+		case *oc.Interface_Ethernet_SwitchedVlan_TrunkVlans_Union_String:
+			var lower, upper uint16
+			n, err := fmt.Sscanf(v.String, "%d..%d", &lower, &upper)
+			if n != 2 || err != nil {
+				return nil, fmt.Errorf("Failed to parse lower and upper bound of trunk VLAN rane: %s", err)
+			}
+
+			if lower >= maxVlansC || upper >= maxVlansC {
+				return nil, fmt.Errorf("Out of range lowwer and upper bound of trunk VLANs (%d, %d)", lower, upper)
+			}
+
+			for ; lower <= upper; lower++ {
+				vlans = append(vlans, lower)
+			}
+		case *oc.Interface_Ethernet_SwitchedVlan_TrunkVlans_Union_Uint16:
+			vlans = append(vlans, v.Uint16)
+		default:
+			return nil, fmt.Errorf("Cannot convert %v to Interface_Ethernet_SwitchedVlan_TrunkVlans_Union, unknown union type, got: %T, want any of [string, uint16]", v, v)
+		}
+	}
+
+	changes := make([]diff.Change, len(vlans))
+	for i, vid := range vlans {
+		var ch diff.Change
+		ch.Type = diff.CREATE
+		ch.From = nil
+		ch.To = vid
+		ch.Path = make([]string, cmd.TrunkVlanEthPathItemsCountC)
+		ch.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
+		ch.Path[cmd.VlanEthIfnamePathItemIdxC] = ifname
+		ch.Path[cmd.VlanEthEthernetPathItemIdxC] = cmd.VlanEthEthernetPathItemC
+		ch.Path[cmd.VlanEthSwVlanPathItemIdxC] = cmd.VlanEthSwVlanPathItemC
+		ch.Path[cmd.VlanEthTrunkVlanPathItemIdxC] = cmd.VlanEthTrunkVlanPathItemC
+		ch.Path[cmd.TrunkVlanEthIdxPathItemIdxC] = fmt.Sprintf("%d", i)
+
+		changes = append(changes, ch)
+	}
+
+	return changes, nil
+}
 
 func isChangedVlanMode(change *diff.Change) bool {
 	if len(change.Path) != cmd.VlanModeEthPathItemsCountC {
@@ -275,6 +398,18 @@ func (this *ConfigMngrT) validateSetAccessVlanEthIntfChange(changeItem *DiffChan
 	}
 
 	if this.transHasBeenStarted {
+		if !this.transConfigLookupTbl.IsThereAnyMemberVlan(vid) {
+			var newChange diff.Change
+			newChange.Type = diff.CREATE
+			newChange.From = nil
+			newChange.To = vid
+			setVlanCmd := cmd.NewSetVlanCmdT(&newChange, this.ethSwitchMgmtClient)
+			id := fmt.Sprintf(idSetVlanNameFmt, vid)
+			if err := this.appendCmdToTransaction(id, setVlanCmd, setVlanC, false); err != nil {
+				return err
+			}
+		}
+
 		id := fmt.Sprintf(idSetAccessVlanNameFmt, vid)
 		if err := this.appendCmdToTransaction(id, setAccessVlanEthIntfCmd, setAccessVlanForEthIntfC, false); err != nil {
 			return err
@@ -335,6 +470,18 @@ func (this *ConfigMngrT) validateDeleteAccessVlanEthIntfChange(changeItem *DiffC
 		return err
 	}
 
+	if !this.transConfigLookupTbl.IsThereAnyMemberVlan(vid) {
+		var newChange diff.Change
+		newChange.Type = diff.DELETE
+		newChange.From = vid
+		newChange.To = nil
+		deleteVlanCmd := cmd.NewDeleteVlanCmdT(&newChange, this.ethSwitchMgmtClient)
+		id := fmt.Sprintf(idDeleteVlanNameFmt, vid)
+		if err := this.appendCmdToTransaction(id, deleteVlanCmd, deleteVlanC, false); err != nil {
+			return err
+		}
+	}
+
 	if needsCreateNewChange {
 		changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
 	}
@@ -381,6 +528,18 @@ func (this *ConfigMngrT) validateSetNativeVlanEthIntfChange(changeItem *DiffChan
 	}
 
 	if this.transHasBeenStarted {
+		if !this.transConfigLookupTbl.IsThereAnyMemberVlan(vid) {
+			var newChange diff.Change
+			newChange.Type = diff.CREATE
+			newChange.From = nil
+			newChange.To = vid
+			setVlanCmd := cmd.NewSetVlanCmdT(&newChange, this.ethSwitchMgmtClient)
+			id := fmt.Sprintf(idSetVlanNameFmt, vid)
+			if err := this.appendCmdToTransaction(id, setVlanCmd, setVlanC, false); err != nil {
+				return err
+			}
+		}
+
 		id := fmt.Sprintf(idSetNativeVlanNameFmt, vid)
 		if err = this.appendCmdToTransaction(id, setNativeVlanEthIntfCmd, setNativeVlanForEthIntfC, false); err != nil {
 			return err
@@ -441,6 +600,18 @@ func (this *ConfigMngrT) validateDeleteNativeVlanEthIntfChange(changeItem *DiffC
 		return err
 	}
 
+	if !this.transConfigLookupTbl.IsThereAnyMemberVlan(vid) {
+		var newChange diff.Change
+		newChange.Type = diff.DELETE
+		newChange.From = vid
+		newChange.To = nil
+		deleteVlanCmd := cmd.NewDeleteVlanCmdT(&newChange, this.ethSwitchMgmtClient)
+		id := fmt.Sprintf(idDeleteVlanNameFmt, vid)
+		if err := this.appendCmdToTransaction(id, deleteVlanCmd, deleteVlanC, false); err != nil {
+			return err
+		}
+	}
+
 	if needsCreateNewChange {
 		changelog.Changes = append(changelog.Changes, NewDiffChangeMgmtT(&newChange))
 	}
@@ -487,6 +658,18 @@ func (this *ConfigMngrT) validateSetTrunkVlanEthIntfChange(changeItem *DiffChang
 	}
 
 	if this.transHasBeenStarted {
+		if !this.transConfigLookupTbl.IsThereAnyMemberVlan(vid) {
+			var newChange diff.Change
+			newChange.Type = diff.CREATE
+			newChange.From = nil
+			newChange.To = vid
+			setVlanCmd := cmd.NewSetVlanCmdT(&newChange, this.ethSwitchMgmtClient)
+			id := fmt.Sprintf(idSetVlanNameFmt, vid)
+			if err := this.appendCmdToTransaction(id, setVlanCmd, setVlanC, false); err != nil {
+				return err
+			}
+		}
+
 		id := fmt.Sprintf(idSetTrunkVlanNameFmt, vid)
 		if err = this.appendCmdToTransaction(id, setTrunkVlanEthIntfCmd, setTrunkVlanForEthIntfC, false); err != nil {
 			return err
@@ -550,6 +733,18 @@ func (this *ConfigMngrT) validateDeleteTrunkVlanEthIntfChange(changeItem *DiffCh
 
 	if err := this.transConfigLookupTbl.deleteTrunkVlanEthIntf(ifname, vid); err != nil {
 		return err
+	}
+
+	if !this.transConfigLookupTbl.IsThereAnyMemberVlan(vid) {
+		var newChange diff.Change
+		newChange.Type = diff.DELETE
+		newChange.From = vid
+		newChange.To = nil
+		deleteVlanCmd := cmd.NewDeleteVlanCmdT(&newChange, this.ethSwitchMgmtClient)
+		id := fmt.Sprintf(idDeleteVlanNameFmt, vid)
+		if err := this.appendCmdToTransaction(id, deleteVlanCmd, deleteVlanC, false); err != nil {
+			return err
+		}
 	}
 
 	if needsCreateNewChange {
@@ -695,6 +890,7 @@ func (this *ConfigMngrT) processDeleteTrunkVlanEthIntfFromChangelog(changelog *D
 }
 
 func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
+	createdVlans := lib.NewVidTSet()
 	var err error
 	for _, ethIfname := range this.configLookupTbl.ethIfnameByIdx {
 		intf := device.GetInterface(ethIfname)
@@ -717,18 +913,8 @@ func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
 			continue
 		}
 
-		var modeChange diff.Change
-		modeChange.Type = diff.CREATE
-		modeChange.From = nil
-		modeChange.To = int32(mode)
-		modeChange.Path = make([]string, cmd.VlanModeEthPathItemsCountC)
-		modeChange.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
-		modeChange.Path[cmd.VlanEthIfnamePathItemIdxC] = ethIfname
-		modeChange.Path[cmd.VlanEthEthernetPathItemIdxC] = cmd.VlanEthEthernetPathItemC
-		modeChange.Path[cmd.VlanEthSwVlanPathItemIdxC] = cmd.VlanEthSwVlanPathItemC
-		modeChange.Path[cmd.VlanEthVlanModePathItemIdxC] = cmd.VlanEthVlanModePathItemC
-
-		vlanModeCmd := cmd.NewSetVlanModeEthIntfCmdT(&modeChange, this.ethSwitchMgmtClient)
+		modeChange := createVlanModeDiffChange(ethIfname, mode)
+		vlanModeCmd := cmd.NewSetVlanModeEthIntfCmdT(modeChange, this.ethSwitchMgmtClient)
 		if err = this.appendCmdToTransaction(ethIfname, vlanModeCmd, setVlanModeForEthIntfC, true); err != nil {
 			return err
 		}
@@ -752,6 +938,15 @@ func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
 				if err = this.appendCmdToTransaction(id, accessVlanCmd, setAccessVlanForEthIntfC, true); err != nil {
 					return err
 				}
+
+				if !createdVlans.Has(accessVlan) {
+					fmt.Printf("Access VLAN %d does not exist. Creating...", accessVlan)
+					if err := this.CreateVlanCmd(accessVlan); err != nil {
+						return err
+					}
+
+					createdVlans.Add(accessVlan)
+				}
 			}
 
 		case oc.OpenconfigVlan_VlanModeType_TRUNK:
@@ -771,6 +966,15 @@ func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
 				id := fmt.Sprintf(idSetNativeVlanNameFmt, nativeVlan)
 				if err = this.appendCmdToTransaction(id, nativeVlanCmd, setNativeVlanForEthIntfC, true); err != nil {
 					return err
+				}
+
+				if !createdVlans.Has(nativeVlan) {
+					fmt.Printf("Native VLAN %d does not exist. Creating...", nativeVlan)
+					if err := this.CreateVlanCmd(nativeVlan); err != nil {
+						return err
+					}
+
+					createdVlans.Add(nativeVlan)
 				}
 			}
 
@@ -792,9 +996,28 @@ func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
 				if err = this.appendCmdToTransaction(id, trunkVlanCmd, setTrunkVlanForEthIntfC, true); err != nil {
 					return err
 				}
+
+				if !createdVlans.Has(trunkVlan) {
+					fmt.Printf("Trunk VLAN %d does not exist. Creating...", trunkVlan)
+					if err := this.CreateVlanCmd(trunkVlan); err != nil {
+						return err
+					}
+
+					createdVlans.Add(trunkVlan)
+				}
 			}
 		}
 	}
 
 	return nil
+}
+
+func (this *ConfigMngrT) CreateVlanCmd(vid lib.VidT) error {
+	var newChange diff.Change
+	newChange.Type = diff.CREATE
+	newChange.From = nil
+	newChange.To = vid
+	setVlanCmd := cmd.NewSetVlanCmdT(&newChange, this.ethSwitchMgmtClient)
+	id := fmt.Sprintf(idSetVlanNameFmt, vid)
+	return this.appendCmdToTransaction(id, setVlanCmd, setVlanC, false)
 }

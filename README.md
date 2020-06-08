@@ -69,3 +69,7 @@ gnmi_capabilities \
   -target_name server.com \
   -alsologtostderr
 ```
+
+### TODO
+Withdrawing breakout port mode should depend on if slave ports still exists
+Shouldn't be port breakout responsible for creating and destroying Ethernet interface?

@@ -6,11 +6,21 @@ cd protobuf
 git checkout git checkout v1.4.0-rc.4 # v1.3.5
 go get ./...
 make install
+#####################
+mkdir $GOPATH/src/github.com/mohae
+cd $GOPATH/src/github.com/mohae
+git clone https://github.com/mohae/deepcopy.git
+cd deepcopy && go get ./...
+##################
+mkdir $GOPATH/src/github.com/openconfig
+cd $GOPATH/src/github.com/openconfig
+git clone https://github.com/openconfig/ygot.git
+cd ygot && git checkout v0.7.4 && go get ./...
 ##################
 mkdir $GOPATH/src/github.com/openconfig
 cd $GOPATH/src/github.com/openconfig
 git clone https://github.com/openconfig/goyang.git
-cd goyang && git checkout 3ecb82e && go get ./... && go build && go install
+cd goyang && go get ./... && go build && go install
 #####################
 mkdir $GOPATH/src/github.com/openconfig
 cd $GOPATH/src/github.com/openconfig

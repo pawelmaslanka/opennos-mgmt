@@ -4,7 +4,7 @@ import (
 	"fmt"
 	cmd "opennos-mgmt/config/command"
 	"opennos-mgmt/gnmi/modeldata/oc"
-	"strings"
+	"regexp"
 
 	log "github.com/golang/glog"
 	"github.com/r3labs/diff"
@@ -256,7 +256,7 @@ func (this *ConfigMngrT) validatePortBreakoutChange(changedItem *DiffChangeMgmtT
 	setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
 	if numChannels == cmd.PortBreakoutModeNoneC {
 		for i := 1; i <= 4; i++ {
-			slavePort := fmt.Sprintf("%s.%d", ifname, i)
+			slavePort := fmt.Sprintf("%s/%d", ifname, i)
 			log.Infof("Composed slave port: %s", slavePort)
 			if err := this.transConfigLookupTbl.checkDependenciesForDeletePortBreakout(slavePort); err != nil {
 				return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
@@ -277,18 +277,19 @@ func (this *ConfigMngrT) validatePortBreakoutChange(changedItem *DiffChangeMgmtT
 		}
 	}
 
-	if numChannels == cmd.PortBreakoutModeNoneC {
-		if err := this.transConfigLookupTbl.addNewInterfaceIfItDoesNotExist(ifname); err != nil {
-			return err
-		}
-	} else {
-		for i := 1; i <= 4; i++ {
-			slavePort := fmt.Sprintf("%s.%d", ifname, i)
-			if err := this.transConfigLookupTbl.addNewInterfaceIfItDoesNotExist(slavePort); err != nil {
-				return err
-			}
-		}
-	}
+	// TODO: Because we explicitly create Ethernet interface, that's why we remove this part from here
+	// if numChannels == cmd.PortBreakoutModeNoneC {
+	// 	if err := this.transConfigLookupTbl.addNewEthIntfIfItDoesNotExist(ifname); err != nil {
+	// 		return err
+	// 	}
+	// } else {
+	// 	for i := 1; i <= 4; i++ {
+	// 		slavePort := fmt.Sprintf("%s/%d", ifname, i)
+	// 		if err := this.transConfigLookupTbl.addNewEthIntfIfItDoesNotExist(slavePort); err != nil {
+	// 			return err
+	// 		}
+	// 	}
+	// }
 
 	numChannelsChangeItem.MarkAsProcessed()
 	channelSpeedChangeItem.MarkAsProcessed()
@@ -366,7 +367,9 @@ func (this *ConfigMngrT) setPortBreakout(device *oc.Device) error {
 	var err error
 	for _, ethIfname := range this.configLookupTbl.ethIfnameByIdx {
 		// We want to process only not splitted ports
-		if strings.ContainsAny(ethIfname, ".") {
+		rgx := regexp.MustCompile(`eth-|/`)
+		tokens := rgx.Split(ethIfname, -1)
+		if len(tokens) == 4 { // breakout mode enable
 			continue
 		}
 

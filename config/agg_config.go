@@ -5,6 +5,7 @@ import (
 	cmd "opennos-mgmt/config/command"
 	"opennos-mgmt/gnmi/modeldata/oc"
 	"opennos-mgmt/utils"
+	"strings"
 
 	log "github.com/golang/glog"
 	"github.com/jinzhu/copier"
@@ -33,7 +34,7 @@ func isChangedAggIntf(change *diff.Change) bool {
 		return false
 	}
 
-	if (change.Path[cmd.AggIntfInterfacePathItemIdxC] == cmd.AggIntfInterfacePathItemC) && (change.Path[cmd.AggIntfNamePathItemIdxC] == cmd.AggIntfNamePathItemC) {
+	if (change.Path[cmd.AggIntfInterfacePathItemIdxC] == cmd.AggIntfInterfacePathItemC) && strings.Contains(change.Path[cmd.AggIntfIfnamePathItemIdxC], "ae") && (change.Path[cmd.AggIntfNamePathItemIdxC] == cmd.AggIntfNamePathItemC) {
 		return true
 	}
 

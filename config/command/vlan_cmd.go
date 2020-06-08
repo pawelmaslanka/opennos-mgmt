@@ -100,6 +100,97 @@ func (this *commandT) doSetVlanModeCmd(shouldBeAbleOnlyToUndo bool) error {
 	return nil
 }
 
+// SetVlanCmdT implements command for create new VLAN
+type SetVlanCmdT struct {
+	*commandT // commandT is embedded as a pointer because its state will be modify
+}
+
+// NewSetVlanCmdT creates new instance of SetVlanCmdT type
+func NewSetVlanCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetVlanCmdT {
+	changes := make([]*diff.Change, maxChangeVlanIdxC)
+	changes[vlanChangeIdxC] = vlan
+	fmt.Printf("[CREATE] Changes:\n%v\n", changes[vlanChangeIdxC])
+	return &SetVlanCmdT{
+		commandT: newCommandT("set vlan", changes, ethSwitchMgmt),
+	}
+}
+
+// Execute implements the same method from CommandI interface and creates new VLAN
+func (this *SetVlanCmdT) Execute() error {
+	shouldBeAbleOnlyToUndo := false
+	isGoingToBeDeleted := false
+	return doCreateOrDeleteVlanCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+}
+
+// Undo implements the same method from CommandI interface and withdraws changes performed by
+// previously execution of Execute() method
+func (this *SetVlanCmdT) Undo() error {
+	shouldBeAbleOnlyToUndo := true
+	isGoingToBeDeleted := true
+	return doCreateOrDeleteVlanCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+}
+
+// GetName implements the same method from CommandI interface and returns name of command
+func (this *SetVlanCmdT) GetName() string {
+	return this.name
+}
+
+// Equals checks if 'this' command and 'other' command are the same... do the same thing
+func (this *SetVlanCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*SetVlanCmdT)
+	return this.equals(otherCmd.commandT)
+}
+
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *SetVlanCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
+}
+
+// DeleteVlanCmdT implements command for delete VLAN
+type DeleteVlanCmdT struct {
+	*commandT // commandT is embedded as a pointer because its state will be modify
+}
+
+// NewDeleteVlanCmdT creates new instance of DeleteAccessVlanCmdT type
+func NewDeleteVlanCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *DeleteVlanCmdT {
+	changes := make([]*diff.Change, maxChangeVlanIdxC)
+	changes[vlanChangeIdxC] = vlan
+	return &DeleteVlanCmdT{
+		commandT: newCommandT("delete vlan", changes, ethSwitchMgmt),
+	}
+}
+
+// Execute implements the same method from CommandI interface and deletes VLAN
+func (this *DeleteVlanCmdT) Execute() error {
+	shouldBeAbleOnlyToUndo := false
+	isGoingToBeDeleted := true
+	return doCreateOrDeleteVlanCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+}
+
+// Undo implements the same method from CommandI interface and withdraws changes performed by
+// previously execution of Execute() method
+func (this *DeleteVlanCmdT) Undo() error {
+	shouldBeAbleOnlyToUndo := true
+	isGoingToBeDeleted := false
+	return doCreateOrDeleteVlanCmd(this.commandT, isGoingToBeDeleted, shouldBeAbleOnlyToUndo)
+}
+
+// GetName implements the same method from CommandI interface and returns name of command
+func (this *DeleteVlanCmdT) GetName() string {
+	return this.name
+}
+
+// Equals checks if 'this' command and 'other' command are the same... do the same thing
+func (this *DeleteVlanCmdT) Equals(other CommandI) bool {
+	otherCmd := other.(*DeleteVlanCmdT)
+	return this.equals(otherCmd.commandT)
+}
+
+// Append extracts internal data of 'other' and attach them to 'this'
+func (this *DeleteVlanCmdT) Append(other CommandI) (bool, error) {
+	return this.append(other)
+}
+
 // SetAccessVlanEthIntfCmdT implements command for set access VLAN for Ethernet Interface
 type SetAccessVlanEthIntfCmdT struct {
 	*commandT // commandT is embedded as a pointer because its state will be modify
@@ -368,6 +459,47 @@ func (this *DeleteTrunkVlanEthIntfCmdT) Equals(other CommandI) bool {
 // Append extracts internal data of 'other' and attach them to 'this'
 func (this *DeleteTrunkVlanEthIntfCmdT) Append(other CommandI) (bool, error) {
 	return this.append(other)
+}
+
+func doCreateOrDeleteVlanCmd(cmd *commandT, toBeDelete bool, shouldBeAbleOnlyToUndo bool) error {
+	if cmd.isAbleOnlyToUndo() != shouldBeAbleOnlyToUndo {
+		return cmd.createErrorAccordingToExecutionState()
+	}
+
+	cmd.dumpInternalData()
+
+	var err error
+	var vid uint16
+	if toBeDelete {
+		vid, err = utils.ConvertGoInterfaceIntoUint16(cmd.changes[0].From)
+	} else {
+		vid, err = utils.ConvertGoInterfaceIntoUint16(cmd.changes[0].To)
+	}
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if toBeDelete {
+		_, err = (*cmd.ethSwitchMgmt).DeleteVlan(ctx, &vlan.DeleteVlanRequest{
+			Vlan: &vlan.Vlan{
+				Vid: uint32(vid),
+			},
+		})
+	} else {
+		_, err = (*cmd.ethSwitchMgmt).CreateVlan(ctx, &vlan.CreateVlanRequest{
+			Vlan: &vlan.Vlan{
+				Vid: uint32(vid),
+			},
+		})
+	}
+	if err != nil {
+		return err
+	}
+
+	cmd.finalize()
+	return nil
 }
 
 func doVlanEthIntfCmd(cmd *commandT, mode vlan.Vlan_Mode, isDelete bool, shouldBeAbleOnlyToUndo bool) error {

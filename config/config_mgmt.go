@@ -8,7 +8,8 @@ import (
 	"opennos-mgmt/gnmi"
 	"opennos-mgmt/gnmi/modeldata/oc"
 	"opennos-mgmt/utils"
-	"strings"
+	"regexp"
+	"strconv"
 	"time"
 
 	cmd "opennos-mgmt/config/command"
@@ -38,13 +39,16 @@ const (
 	deleteEthIntfFromNativeVlanC                    // Remove Ethernet interface from native VLAN
 	deleteAggIntfFromNativeVlanC                    // Remove LAG interface from native VLAN
 	deleteEthIntfFromTrunkVlanC                     // Remove Ethernet interface from trunk VLAN
+	deleteVlanC                                     // Delete VLAN
 	deleteEthIntfFromAggIntfC                       // Remove Ethernet interface from LAG membership
 	deleteAggIntfParamsC                            // Remove LAG parameters
 	deleteAggIntfMemberC                            // Remove Ethernet interface from LAG
 	deleteAggIntfC                                  // Delete LAG interface
+	deleteEthIntfC                                  // Delete Ethernet interface
 	deletePortBreakoutC                             // Combine multiple logical ports into single port
 	setPortBreakoutC                                // Break out front panel port into multiple logical ports
 	setPortBreakoutChanSpeedC                       // Set channel speed on logical ports (lanes)
+	setEthIntfC                                     // Create new Ethernet interface
 	setDescForEthIntfC                              // Set description of Ethernet interface
 	setPortAutoNegForEthIntfC                       // Enable or disable auto-negotiation on port
 	setPortMtuForEthIntfC                           // Set MTU on port
@@ -52,6 +56,7 @@ const (
 	setAggIntfC                                     // Create new LAG interface
 	setAggIntfParamsC                               // Set LAG parameters
 	setAggIntfMemberC                               // Add Ethernet interface to LAG
+	setVlanC                                        // Create new VLAN
 	setVlanModeForEthIntfC                          // Set VLAN interface mode for Ethernet interface
 	setVlanModeForAggIntfC                          // Set VLAN interface mode for LAG interface
 	setAccessVlanForEthIntfC                        // Assign Ethernet interface to access VLAN
@@ -217,7 +222,19 @@ func (this *ConfigMngrT) DiscardOrFinishTrans() error {
 	return nil
 }
 
+func getBreakoutMasterPort(ifname string) (string, bool) {
+	rgx := regexp.MustCompile(`eth-|/`)
+	tokens := rgx.Split(ifname, -1)
+	if len(tokens) == 4 { // breakout mode enable
+		masterPort := fmt.Sprintf("eth-%s/%s", tokens[1], tokens[2]) // masterPort
+		return masterPort, true
+	}
+
+	return "", false
+}
+
 func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
+	var err error
 	configModel, err := model.NewConfigStruct(config)
 	if err != nil {
 		return err
@@ -225,37 +242,37 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 
 	log.Infof("Dump config model: %+v", configModel)
 	device := configModel.(*oc.Device)
-	for ethIfname := range device.Interface {
-		if strings.ContainsAny(ethIfname, ".") {
-			var masterPort, slavePort int
-			if n, err := fmt.Sscanf(ethIfname, "eth-%d.%d", &masterPort, &slavePort); n < 1 {
-				return fmt.Errorf("1. Failed to break out Ethernet interface %s into master and slave port: %s",
-					ethIfname, err)
-			}
-
-			port := fmt.Sprintf("eth-%d", masterPort)
-			if !isPortSplitted(device, port) {
-				log.Infof("1. Port %s is not splitted", port)
+	for ifname := range device.Interface {
+		masterPort, exists := getBreakoutMasterPort(ifname)
+		if exists { // breakout mode enable
+			if !isPortSplitted(device, masterPort) {
+				log.Infof("Port %s is not splitted", masterPort)
 				continue
 			}
 		}
 
-		if err := this.configLookupTbl.addNewInterfaceIfItDoesNotExist(ethIfname); err != nil {
-			return err
+		intf := device.Interface[ifname]
+		if agg := intf.GetAggregation(); agg != nil {
+			if agg.GetLagType() == oc.OpenconfigIfAggregate_AggregationType_UNSET {
+				return fmt.Errorf("Invalid LAG type on interface %s",
+					ifname, err)
+			}
+
+			if err = this.configLookupTbl.addNewAggIntfIfItDoesNotExist(ifname); err != nil {
+				return err
+			}
+		} else {
+			if err = this.configLookupTbl.addNewEthIntfIfItDoesNotExist(ifname); err != nil {
+				return err
+			}
 		}
 	}
 
 	for ethIfname := range this.configLookupTbl.idxByEthIfname {
-		if strings.ContainsAny(ethIfname, ".") {
-			var masterPort, slavePort int
-			if n, err := fmt.Sscanf(ethIfname, "eth-%d.%d", &masterPort, &slavePort); n < 1 {
-				return fmt.Errorf("2. Failed to break out Ethernet interface %s into master and slave port: %s",
-					ethIfname, err)
-			}
-
-			port := fmt.Sprintf("eth-%d", masterPort)
-			if !isPortSplitted(device, port) {
-				log.Infof("2. Port %s is not splitted", port)
+		masterPort, exists := getBreakoutMasterPort(ethIfname)
+		if exists { // breakout mode enable
+			if !isPortSplitted(device, masterPort) {
+				log.Infof("Port %s is not splitted", masterPort)
 				continue
 			}
 		}
@@ -331,6 +348,10 @@ func (this *ConfigMngrT) configureDevice(configModel *ygot.ValidatedGoStruct) er
 		return err
 	}
 
+	if err = this.setEthIntf(device); err != nil {
+		return err
+	}
+
 	if err = this.setAggIntf(device); err != nil {
 		return err
 	}
@@ -356,7 +377,8 @@ func (this *ConfigMngrT) configureDevice(configModel *ygot.ValidatedGoStruct) er
 
 func isPortSplitted(device *oc.Device, ethIfname string) bool {
 	// We want to process only not splitted ports
-	if strings.ContainsAny(ethIfname, ".") {
+	_, exists := getBreakoutMasterPort(ethIfname)
+	if exists { // breakout mode enable
 		return false
 	}
 
@@ -395,7 +417,7 @@ func (this *ConfigMngrT) appendCmdToTransaction(idName string, cmdAdd cmd.Comman
 		}
 	}
 
-	log.Infof("%s: Command %q and shoutld be in batch - %v", idName, cmdAdd.GetName(), shouldBeMerged)
+	log.Infof("%s: Command %q and should be in batch - %v", idName, cmdAdd.GetName(), shouldBeMerged)
 
 	if shouldBeMerged {
 		if cmd, exists := cmds[idName]; exists {
@@ -434,7 +456,7 @@ func (this *ConfigMngrT) GetDiffRunningConfigWithCandidateConfig(candidateConfig
 }
 
 func (this *ConfigMngrT) isEthIntfAvailable(ifname string) bool {
-	if _, exists := this.configLookupTbl.idxByEthIfname[ifname]; exists {
+	if _, exists := this.transConfigLookupTbl.idxByEthIfname[ifname]; exists {
 		return true
 	}
 
@@ -449,10 +471,57 @@ func (this *ConfigMngrT) isTransPending() bool {
 	return this.transHasBeenStarted
 }
 
-func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateConfig *ygot.ValidatedGoStruct) error {
-	diffChangelog := NewDiffChangelogMgmtT(changelog)
+func extractEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, error) {
+	changes := make([]diff.Change, 0)
 	var err error
+	for _, ch := range *changelog {
+		var newChanges []diff.Change
+		if isCreatedEthIntf(&ch) {
+			ifname := ch.Path[cmd.EthIntfIfnamePathItemIdxC]
+			fmt.Printf("Creating new Ethernet interface %s\n%T\n", ifname, ch.To)
+			ethIntf := ch.To.(*oc.Interface_Ethernet)
+			if newChanges, err = extractVlanRelatedParametersFromEthIntf(ifname, ethIntf); err != nil {
+				return nil, err
+			}
+		}
 
+		if isCreateEthSubintfIpv4(&ch) {
+			if ch.To == nil {
+				continue
+			}
+
+			ifname := ch.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC]
+			subintfIdx, err := strconv.Atoi(ch.Path[cmd.Ipv4AddrEthSubintfIdxPathItemIdxC])
+			if err != nil {
+				return nil, err
+			}
+
+			if subintfIdx < 0 {
+				return nil, fmt.Errorf("Negative value of Ethernet subinterface index")
+			}
+
+			fmt.Printf("Creating new Ethernet subinterface IPv4 %s\n%T\n", ifname, ch.To)
+			subintf := ch.To.(*oc.Interface_Subinterface_Ipv4)
+			if newChanges, err = extractIpParametersFromEthSubintfIpv4(ifname, subintfIdx, subintf); err != nil {
+				return nil, err
+			}
+		}
+
+		changes = append(changes, newChanges...)
+	}
+
+	*changelog = append(*changelog, changes...)
+
+	return changelog, nil
+}
+
+func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateConfig *ygot.ValidatedGoStruct) error {
+	var err error
+	if changelog, err = extractEthIntfParams(changelog); err != nil {
+		return fmt.Errorf("Failed to extract new Ethernet interface parameters from changelog: %s", err)
+	}
+
+	diffChangelog := NewDiffChangelogMgmtT(changelog)
 	currentDefaultConfigAction := this.getCurrentTransDefaultConfigAction()
 	if change, exists := findDisallowedManagementTreeNodeDeleteOperation(diffChangelog); exists {
 		return fmt.Errorf("Delete operation on tree node %q is disallowed", change.Path)
@@ -503,6 +572,7 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 	if err != nil {
 		return err
 	}
+
 	rawCandidateConfig, err := gnmi.ConvertYgotGoStructIntoJsonByteStream(*candidateConfig)
 	if err != nil {
 		return err
@@ -567,11 +637,17 @@ func (this *ConfigMngrT) parseChangelogAndConvertToCommands(diffChangelog *DiffC
 		if err = this.processDeleteAggIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
+		if err = this.processDeleteEthIntfFromChangelog(diffChangelog); err != nil {
+			return err
+		}
 		// Set section
 		if err = this.processSetPortBreakoutFromChangelog(diffChangelog); err != nil {
 			return err
 		}
 		if err = this.processSetPortBreakoutChanSpeedFromChangelog(diffChangelog); err != nil {
+			return err
+		}
+		if err = this.processSetEthIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
 		if err = this.processSetAggIntfFromChangelog(diffChangelog); err != nil {

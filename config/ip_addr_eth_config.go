@@ -8,10 +8,100 @@ import (
 	cmd "opennos-mgmt/config/command"
 	"opennos-mgmt/gnmi/modeldata/oc"
 	"opennos-mgmt/utils"
+	"strings"
 
 	log "github.com/golang/glog"
 	"github.com/r3labs/diff"
 )
+
+func extractIpParametersFromEthSubintfIpv4(ifname string, subintfIdx int, subintf *oc.Interface_Subinterface_Ipv4) ([]diff.Change, error) {
+	changes := make([]diff.Change, 0)
+	for ipAddr := range subintf.Address {
+		addr := subintf.GetAddress(ipAddr)
+		if addr == nil {
+			continue
+		}
+
+		ip := addr.GetIp()
+		prfxLen := addr.PrefixLength
+		if len(ip) == 0 {
+			if prfxLen != nil {
+				return nil, fmt.Errorf("Missed IPv4 address of subinterface %d", subintfIdx)
+			}
+
+			continue
+		}
+
+		if prfxLen == nil {
+			return nil, fmt.Errorf("Missed prefix length of IPv4 address %s", ip)
+		}
+
+		changes = append(changes, *createEthSubintfIpv4IpDiffChange(ifname, subintfIdx, ip))
+		changes = append(changes, *createEthSubintfIpv4PrfxLenDiffChange(ifname, subintfIdx, ip, prfxLen))
+	}
+
+	return changes, nil
+}
+
+func createEthSubintfIpv4IpDiffChange(ifname string, subintfIdx int, ip string) *diff.Change {
+	var ch diff.Change
+	ch.Type = diff.CREATE
+	ch.From = nil
+	ch.To = ip
+	ch.Path = make([]string, cmd.Ipv4AddrEthPathItemsCountC)
+	ch.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] = cmd.Ipv4AddrEthIntfPathItemC
+	ch.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] = ifname
+	ch.Path[cmd.Ipv4AddrEthSubintfPathItemIdxC] = cmd.Ipv4AddrEthSubintfPathItemC
+	ch.Path[cmd.Ipv4AddrEthSubintfIdxPathItemIdxC] = fmt.Sprintf("%d", subintfIdx)
+	ch.Path[cmd.Ipv4AddrEthSubintfIpv4PathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4PathItemC
+	ch.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4AddrPathItemC
+	ch.Path[cmd.Ipv4AddrEthSubintfIpv4AddrIpPathItemIdxC] = ip
+	ch.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemC
+
+	return &ch
+}
+
+func createEthSubintfIpv4PrfxLenDiffChange(ifname string, subintfIdx int, ip string, prfxLen *uint8) *diff.Change {
+	var ch diff.Change
+	ch.Type = diff.CREATE
+	ch.From = nil
+	ch.To = prfxLen
+	ch.Path = make([]string, cmd.Ipv4AddrEthPathItemsCountC)
+	ch.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] = cmd.Ipv4AddrEthIntfPathItemC
+	ch.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] = ifname
+	ch.Path[cmd.Ipv4AddrEthSubintfPathItemIdxC] = cmd.Ipv4AddrEthSubintfPathItemC
+	ch.Path[cmd.Ipv4AddrEthSubintfIdxPathItemIdxC] = fmt.Sprintf("%d", subintfIdx)
+	ch.Path[cmd.Ipv4AddrEthSubintfIpv4PathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4PathItemC
+	ch.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4AddrPathItemC
+	ch.Path[cmd.Ipv4AddrEthSubintfIpv4AddrIpPathItemIdxC] = ip
+	ch.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemIdxC] = cmd.Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemC
+
+	return &ch
+}
+
+func isCreateEthSubintfIpv4(change *diff.Change) bool {
+	if len(change.Path) != cmd.Ipv4AddrEthSubintfIpv4ItemsCountC {
+		return false
+	}
+
+	if change.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] != cmd.Ipv4AddrEthIntfPathItemC {
+		return false
+	}
+
+	if !strings.Contains(change.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC], "eth") {
+		return false
+	}
+
+	if change.Path[cmd.Ipv4AddrEthSubintfPathItemIdxC] != cmd.Ipv4AddrEthSubintfPathItemC {
+		return false
+	}
+
+	if change.Path[cmd.Ipv4AddrEthSubintfIpv4PathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4PathItemC {
+		return false
+	}
+
+	return true
+}
 
 func (this *ConfigMngrT) getIpv4AddrEthSubintfIpFromChangelog(ifname string, changelog *DiffChangelogMgmtT, goingToBeDeleted bool) (string, error) {
 	var err error = nil
@@ -165,7 +255,7 @@ func (this *ConfigMngrT) IsChangedIpv4AddrEthSubintfIp(change *diff.Change) bool
 		return false
 	}
 
-	if (change.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] != cmd.Ipv4AddrEthIntfPathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfPathItemIdxC] != cmd.Ipv4AddrEthSubintfPathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4PathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4PathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemC) {
+	if (change.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] != cmd.Ipv4AddrEthIntfPathItemC) || !strings.Contains(change.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC], "eth") || (change.Path[cmd.Ipv4AddrEthSubintfPathItemIdxC] != cmd.Ipv4AddrEthSubintfPathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4PathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4PathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPathItemC) || (change.Path[cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemIdxC] != cmd.Ipv4AddrEthSubintfIpv4AddrPartIpPathItemC) {
 		return false
 	}
 

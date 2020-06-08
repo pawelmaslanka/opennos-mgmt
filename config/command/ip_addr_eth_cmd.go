@@ -18,6 +18,7 @@ const (
 	Ipv4AddrEthSubintfIdxPathItemIdxC                 = 3
 	Ipv4AddrEthSubintfIpv4PathItemIdxC                = 4
 	Ipv4AddrEthSubintfIpv4AddrPathItemIdxC            = 5
+	Ipv4AddrEthSubintfIpv4ItemsCountC                 = 5
 	Ipv4AddrEthSubintfIpv4AddrIpPathItemIdxC          = 6
 	Ipv4AddrEthSubintfIpv4AddrPartIpPathItemIdxC      = 7
 	Ipv4AddrEthSubintfIpv4AddrPartPrfxLenPathItemIdxC = 7
