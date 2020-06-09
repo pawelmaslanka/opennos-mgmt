@@ -43,6 +43,7 @@ const (
 	deleteEthIntfFromAggIntfC                       // Remove Ethernet interface from LAG membership
 	deleteAggIntfParamsC                            // Remove LAG parameters
 	deleteAggIntfMemberC                            // Remove Ethernet interface from LAG
+	deleteAggIntfLacpC                              // Disable LACP protocol for aggregate interface
 	deleteAggIntfC                                  // Delete LAG interface
 	deleteEthIntfC                                  // Delete Ethernet interface
 	deletePortBreakoutC                             // Combine multiple logical ports into single port
@@ -54,6 +55,7 @@ const (
 	setPortMtuForEthIntfC                           // Set MTU on port
 	setPortSpeedForEthIntfC                         // Set port speed
 	setAggIntfC                                     // Create new LAG interface
+	setAggIntfLacpC                                 // Enable LACP protocol for aggregate interface
 	setAggIntfParamsC                               // Set LAG parameters
 	setAggIntfMemberC                               // Add Ethernet interface to LAG
 	setVlanC                                        // Create new VLAN
@@ -477,11 +479,24 @@ func extractEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, error) {
 	for _, ch := range *changelog {
 		var newChanges []diff.Change
 		if isCreatedEthIntf(&ch) {
+			newEthIntfChanges := make([]diff.Change, 0)
 			ifname := ch.Path[cmd.EthIntfIfnamePathItemIdxC]
 			fmt.Printf("Creating new Ethernet interface %s\n%T\n", ifname, ch.To)
 			ethIntf := ch.To.(*oc.Interface_Ethernet)
+			if newEthIntfChanges, err = extractAggIdFromEthIntf(ifname, ethIntf); err != nil {
+				return nil, err
+			}
+
+			if len(newEthIntfChanges) > 0 {
+				newChanges = append(newChanges, newEthIntfChanges...)
+			}
+
 			if newChanges, err = extractVlanRelatedParametersFromEthIntf(ifname, ethIntf); err != nil {
 				return nil, err
+			}
+
+			if len(newEthIntfChanges) > 0 {
+				newChanges = append(newChanges, newEthIntfChanges...)
 			}
 		}
 

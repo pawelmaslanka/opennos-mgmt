@@ -17,6 +17,33 @@ const (
 	idDeleteAggIntfMemberNameFmt = "sm-%s"
 )
 
+func extractAggIdFromEthIntf(ethIfname string, ethIntf *oc.Interface_Ethernet) ([]diff.Change, error) {
+	changes := make([]diff.Change, 0)
+	aggIfname := ethIntf.GetAggregateId()
+	if len(aggIfname) > 0 {
+		fmt.Printf("Found belonging %s to %s\n", ethIfname, aggIfname)
+		changes = append(changes, *createAggIntfMemberDiffChange(ethIfname, aggIfname))
+	}
+
+	return changes, nil
+}
+
+func createAggIntfMemberDiffChange(ethIfname string, aggIfname string) *diff.Change {
+	var ch diff.Change
+	ch.Type = diff.CREATE
+	ch.From = nil
+	ch.To = aggIfname
+	ch.Path = make([]string, cmd.AggIntfMemberPathItemsCountC)
+	ch.Path[cmd.AggIntfInterfacePathItemIdxC] = cmd.AggIntfInterfacePathItemC
+	ch.Path[cmd.AggIntfIfnamePathItemIdxC] = ethIfname
+	ch.Path[cmd.AggIntfMemberEthernetPathItemIdxC] = cmd.AggIntfMemberEthernetPathItemC
+	ch.Path[cmd.AggIntfMemberAggIdPathItemIdxC] = cmd.AggIntfMemberAggIdPathItemC
+
+	fmt.Printf("Aggregate interface diff change:\n%v\n", ch)
+
+	return &ch
+}
+
 func isChangedAggIntfMember(change *diff.Change) bool {
 	if len(change.Path) != cmd.AggIntfMemberPathItemsCountC {
 		return false

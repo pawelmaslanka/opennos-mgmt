@@ -799,7 +799,7 @@
         {
           "config": {
             "name": "ae-1",
-            "interfval": "SLOW",
+            "interval": "SLOW",
             "lacp-mode": "ACTIVE",
             "members": {
               "member": [
@@ -826,7 +826,7 @@
         {
           "config": {
             "name": "ae-2",
-            "interfval": "SLOW",
+            "interval": "SLOW",
             "lacp-mode": "ACTIVE",
             "members": {
               "member": [

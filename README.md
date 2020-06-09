@@ -73,3 +73,6 @@ gnmi_capabilities \
 ### TODO
 Withdrawing breakout port mode should depend on if slave ports still exists
 Shouldn't be port breakout responsible for creating and destroying Ethernet interface?
+During removing Ethernet interface there should be check all dependencies from this interface
+Before disable port breakout check if all slave interfaces are removed
+Before enable port breakout check if master port has been removed
