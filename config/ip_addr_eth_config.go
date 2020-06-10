@@ -80,6 +80,18 @@ func createEthSubintfIpv4PrfxLenDiffChange(ifname string, subintfIdx int, ip str
 }
 
 func isCreateEthSubintfIpv4(change *diff.Change) bool {
+	if change.Type != diff.CREATE {
+		return false
+	}
+
+	if change.From != nil {
+		return false
+	}
+
+	if change.To == nil {
+		return false
+	}
+
 	if len(change.Path) != cmd.Ipv4AddrEthSubintfIpv4ItemsCountC {
 		return false
 	}

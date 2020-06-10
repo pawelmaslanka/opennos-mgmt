@@ -12,6 +12,18 @@ import (
 )
 
 func isCreatedEthIntf(change *diff.Change) bool {
+	if change.Type != diff.CREATE {
+		return false
+	}
+
+	if change.From != nil {
+		return false
+	}
+
+	if change.To == nil {
+		return false
+	}
+
 	if len(change.Path) != cmd.EthIntfPathItemsCountC {
 		return false
 	}

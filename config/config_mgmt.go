@@ -473,7 +473,7 @@ func (this *ConfigMngrT) isTransPending() bool {
 	return this.transHasBeenStarted
 }
 
-func extractEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, error) {
+func extractCreateEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, error) {
 	changes := make([]diff.Change, 0)
 	var err error
 	for _, ch := range *changelog {
@@ -501,10 +501,6 @@ func extractEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, error) {
 		}
 
 		if isCreateEthSubintfIpv4(&ch) {
-			if ch.To == nil {
-				continue
-			}
-
 			ifname := ch.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC]
 			subintfIdx, err := strconv.Atoi(ch.Path[cmd.Ipv4AddrEthSubintfIdxPathItemIdxC])
 			if err != nil {
@@ -532,7 +528,7 @@ func extractEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, error) {
 
 func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateConfig *ygot.ValidatedGoStruct) error {
 	var err error
-	if changelog, err = extractEthIntfParams(changelog); err != nil {
+	if changelog, err = extractCreateEthIntfParams(changelog); err != nil {
 		return fmt.Errorf("Failed to extract new Ethernet interface parameters from changelog: %s", err)
 	}
 
