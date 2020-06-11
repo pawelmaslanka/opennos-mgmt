@@ -477,13 +477,18 @@ func extractCreateEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, err
 	changes := make([]diff.Change, 0)
 	var err error
 	for _, ch := range *changelog {
+		if !isCreateDiffChange(&ch) {
+			continue
+		}
+
 		var newChanges []diff.Change
-		if isCreatedEthIntf(&ch) {
+		if isCreateOrDeleteEthIntf(&ch) {
 			newEthIntfChanges := make([]diff.Change, 0)
 			ifname := ch.Path[cmd.EthIntfIfnamePathItemIdxC]
 			fmt.Printf("Creating new Ethernet interface %s\n%T\n", ifname, ch.To)
+			isDelete := true
 			ethIntf := ch.To.(*oc.Interface_Ethernet)
-			if newEthIntfChanges, err = extractAggIdFromEthIntf(ifname, ethIntf); err != nil {
+			if newEthIntfChanges, err = extractAggIdFromEthIntf(ifname, ethIntf, isDelete); err != nil {
 				return nil, err
 			}
 
@@ -491,7 +496,7 @@ func extractCreateEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, err
 				newChanges = append(newChanges, newEthIntfChanges...)
 			}
 
-			if newChanges, err = extractVlanRelatedParametersFromEthIntf(ifname, ethIntf); err != nil {
+			if newChanges, err = extractVlanRelatedParametersFromEthIntf(ifname, ethIntf, isDelete); err != nil {
 				return nil, err
 			}
 
@@ -500,7 +505,7 @@ func extractCreateEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, err
 			}
 		}
 
-		if isCreateEthSubintfIpv4(&ch) {
+		if isCreateOrDeleteEthSubintfIpv4(&ch) {
 			ifname := ch.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC]
 			subintfIdx, err := strconv.Atoi(ch.Path[cmd.Ipv4AddrEthSubintfIdxPathItemIdxC])
 			if err != nil {
@@ -513,7 +518,7 @@ func extractCreateEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, err
 
 			fmt.Printf("Creating new Ethernet subinterface IPv4 %s\n%T\n", ifname, ch.To)
 			subintf := ch.To.(*oc.Interface_Subinterface_Ipv4)
-			if newChanges, err = extractIpParametersFromEthSubintfIpv4(ifname, subintfIdx, subintf); err != nil {
+			if newChanges, err = extractIpParametersFromEthSubintfIpv4(ifname, subintfIdx, subintf, false); err != nil {
 				return nil, err
 			}
 		}
@@ -526,9 +531,106 @@ func extractCreateEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, err
 	return changelog, nil
 }
 
+func extractDeleteEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, error) {
+	changes := make([]diff.Change, 0)
+	var err error
+	for _, ch := range *changelog {
+		fmt.Printf("Delete change \n%v\n", ch)
+
+		if !isDeleteDiffChange(&ch) {
+			continue
+		}
+
+		var newChanges []diff.Change
+		// On the above check we know that we have 'delete case'
+		if isCreateOrDeleteEthIntf(&ch) {
+			newEthIntfChanges := make([]diff.Change, 0)
+			ifname := ch.Path[cmd.EthIntfIfnamePathItemIdxC]
+			fmt.Printf("Removing Ethernet interface %s\n%T\n", ifname, ch.From)
+			isDelete := true
+			ethIntf := ch.From.(*oc.Interface_Ethernet)
+			if newEthIntfChanges, err = extractAggIdFromEthIntf(ifname, ethIntf, isDelete); err != nil {
+				return nil, err
+			}
+
+			if len(newEthIntfChanges) > 0 {
+				newChanges = append(newChanges, newEthIntfChanges...)
+			}
+
+			if newChanges, err = extractVlanRelatedParametersFromEthIntf(ifname, ethIntf, isDelete); err != nil {
+				return nil, err
+			}
+
+			if len(newEthIntfChanges) > 0 {
+				newChanges = append(newChanges, newEthIntfChanges...)
+			}
+		}
+
+		if isCreateOrDeleteEthSubintfIpv4(&ch) {
+			ifname := ch.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC]
+			subintfIdx, err := strconv.Atoi(ch.Path[cmd.Ipv4AddrEthSubintfIdxPathItemIdxC])
+			if err != nil {
+				return nil, err
+			}
+
+			if subintfIdx < 0 {
+				return nil, fmt.Errorf("Negative value of Ethernet subinterface index")
+			}
+
+			fmt.Printf("Creating new Ethernet subinterface IPv4 %s\n%T\n", ifname, ch.From)
+			subintf := ch.From.(*oc.Interface_Subinterface_Ipv4)
+			if newChanges, err = extractIpParametersFromEthSubintfIpv4(ifname, subintfIdx, subintf, true); err != nil {
+				return nil, err
+			}
+		}
+
+		changes = append(changes, newChanges...)
+	}
+
+	*changelog = append(*changelog, changes...)
+
+	return changelog, nil
+}
+
+func isCreateDiffChange(change *diff.Change) bool {
+	if change.Type != diff.CREATE {
+		return false
+	}
+
+	if change.From != nil {
+		return false
+	}
+
+	if change.To == nil {
+		return false
+	}
+
+	return true
+}
+
+func isDeleteDiffChange(change *diff.Change) bool {
+	if change.Type != diff.DELETE {
+		return false
+	}
+
+	if change.From == nil {
+		return false
+	}
+
+	if change.To != nil {
+		return false
+	}
+
+	return true
+}
+
 func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateConfig *ygot.ValidatedGoStruct) error {
 	var err error
 	if changelog, err = extractCreateEthIntfParams(changelog); err != nil {
+		return fmt.Errorf("Failed to extract new Ethernet interface parameters from changelog: %s", err)
+	}
+
+	if changelog, err = extractDeleteEthIntfParams(changelog); err != nil {
 		return fmt.Errorf("Failed to extract new Ethernet interface parameters from changelog: %s", err)
 	}
 

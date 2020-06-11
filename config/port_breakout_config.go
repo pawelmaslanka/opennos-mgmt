@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"fmt"
 	cmd "opennos-mgmt/config/command"
 	"opennos-mgmt/gnmi/modeldata/oc"
@@ -206,9 +207,18 @@ func (this *ConfigMngrT) isChangedPortBreakoutChanSpeed(change *diff.Change) boo
 
 func (this *ConfigMngrT) validatePortBreakoutChange(changedItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
 	ifname := changedItem.Change.Path[cmd.PortBreakoutIfnamePathItemIdxC]
-	if !this.isEthIntfAvailable(ifname) {
-		return fmt.Errorf("Port %s is unrecognized", ifname)
+	device := this.runningConfig.(*oc.Device)
+	if device == nil {
+		return fmt.Errorf("Cannot get device object for verify breakout port capability for Ethernet interface %s", ifname)
 	}
+
+	if device.GetComponent(ifname) == nil {
+		return fmt.Errorf("Cannot breakout port for Ethernet interface %s because component does not exist", ifname)
+	}
+
+	// if !this.isEthIntfAvailable(ifname) {
+	// 	return fmt.Errorf("Port %s is unrecognized", ifname)
+	// }
 
 	var numChannels cmd.PortBreakoutModeT = cmd.PortBreakoutModeInvalidC
 	var channelSpeed oc.E_OpenconfigIfEthernet_ETHERNET_SPEED = oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET
@@ -255,18 +265,23 @@ func (this *ConfigMngrT) validatePortBreakoutChange(changedItem *DiffChangeMgmtT
 	log.Infof("Requested changing port %s breakout into mode %d with speed %d", ifname, numChannels, channelSpeed)
 	setPortBreakoutCmd := cmd.NewSetPortBreakoutCmdT(numChannelsChangeItem.Change, channelSpeedChangeItem.Change, this.ethSwitchMgmtClient)
 	if numChannels == cmd.PortBreakoutModeNoneC {
+		var errMsg bytes.Buffer
 		for i := 1; i <= 4; i++ {
 			slavePort := fmt.Sprintf("%s/%d", ifname, i)
 			log.Infof("Composed slave port: %s", slavePort)
 			if err := this.transConfigLookupTbl.checkDependenciesForDeletePortBreakout(slavePort); err != nil {
-				return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
-					setPortBreakoutCmd.GetName(), slavePort, err)
+				errMsg.WriteString(err.Error())
 			}
+		}
+
+		if errMsg.Len() > 0 {
+			return fmt.Errorf("Cannot %q because there are dependencies:\n%s",
+				setPortBreakoutCmd.GetName(), errMsg.String())
 		}
 	} else {
 		if err := this.transConfigLookupTbl.checkDependenciesForDeletePortBreakout(ifname); err != nil {
-			return fmt.Errorf("Cannot %q because there are dependencies from interface %s:\n%s",
-				setPortBreakoutCmd.GetName(), ifname, err)
+			return fmt.Errorf("Cannot %q because there is dependency:\n%s",
+				setPortBreakoutCmd.GetName(), err)
 		}
 	}
 
@@ -276,20 +291,6 @@ func (this *ConfigMngrT) validatePortBreakoutChange(changedItem *DiffChangeMgmtT
 			return err
 		}
 	}
-
-	// TODO: Because we explicitly create Ethernet interface, that's why we remove this part from here
-	// if numChannels == cmd.PortBreakoutModeNoneC {
-	// 	if err := this.transConfigLookupTbl.addNewEthIntfIfItDoesNotExist(ifname); err != nil {
-	// 		return err
-	// 	}
-	// } else {
-	// 	for i := 1; i <= 4; i++ {
-	// 		slavePort := fmt.Sprintf("%s/%d", ifname, i)
-	// 		if err := this.transConfigLookupTbl.addNewEthIntfIfItDoesNotExist(slavePort); err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// }
 
 	numChannelsChangeItem.MarkAsProcessed()
 	channelSpeedChangeItem.MarkAsProcessed()

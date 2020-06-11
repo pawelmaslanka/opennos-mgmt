@@ -23,27 +23,32 @@ const (
 	idDeleteTrunkVlanNameFmt  = "stv-%d"
 )
 
-func extractVlanRelatedParametersFromEthIntf(ifname string, ethIntf *oc.Interface_Ethernet) ([]diff.Change, error) {
+func extractVlanRelatedParametersFromEthIntf(ifname string, ethIntf *oc.Interface_Ethernet, isDelete bool) ([]diff.Change, error) {
 	changes := make([]diff.Change, 0)
 	swVlan := ethIntf.GetSwitchedVlan()
 	if swVlan == nil {
 		return changes, nil
 	}
 
+	fmt.Printf("Dump Switched Vlan:\n%v\n", *swVlan)
+
 	if vlanMode := swVlan.GetInterfaceMode(); vlanMode != oc.OpenconfigVlan_VlanModeType_UNSET {
-		changes = append(changes, *createVlanModeDiffChange(ifname, vlanMode))
+		changes = append(changes, *createVlanModeDiffChange(ifname, vlanMode, isDelete))
 	}
 
 	if accessVlan := swVlan.GetAccessVlan(); accessVlan != 0 { // 0 is incorrect VLAN ID
-		changes = append(changes, *createAccessVlanDiffChange(ifname, accessVlan))
+		fmt.Printf("Requested modify ACCESS VLAN %d\n", accessVlan)
+		changes = append(changes, *createAccessVlanDiffChange(ifname, accessVlan, isDelete))
 	}
 
 	if nativeVlan := swVlan.GetNativeVlan(); nativeVlan != 0 { // 0 is incorrect VLAN ID
-		changes = append(changes, *createAccessVlanDiffChange(ifname, nativeVlan))
+		fmt.Printf("Requested modify NATIVE VLAN %d\n", nativeVlan)
+		changes = append(changes, *createNativeVlanDiffChange(ifname, nativeVlan, isDelete))
 	}
 
 	if trunkVlans := swVlan.GetTrunkVlans(); len(trunkVlans) > 0 {
-		newChanges, err := createTrunkVlansDiffChange(ifname, trunkVlans)
+		fmt.Printf("Requested modify TRUNK VLANs %v\n", trunkVlans)
+		newChanges, err := createTrunkVlansDiffChange(ifname, trunkVlans, isDelete)
 		if err != nil {
 			return nil, err
 		}
@@ -54,11 +59,33 @@ func extractVlanRelatedParametersFromEthIntf(ifname string, ethIntf *oc.Interfac
 	return changes, nil
 }
 
-func createVlanModeDiffChange(ifname string, vlanMode oc.E_OpenconfigVlan_VlanModeType) *diff.Change {
+func createEmptyDiffChangeWithVlanAndNilPath(vid uint16, isDelete bool) diff.Change {
 	var ch diff.Change
-	ch.Type = diff.CREATE
-	ch.From = nil
-	ch.To = vlanMode
+	if isDelete {
+		ch.Type = diff.DELETE
+		ch.From = vid
+		ch.To = nil
+	} else {
+		ch.Type = diff.CREATE
+		ch.From = nil
+		ch.To = vid
+	}
+
+	return ch
+}
+
+func createVlanModeDiffChange(ifname string, vlanMode oc.E_OpenconfigVlan_VlanModeType, isDelete bool) *diff.Change {
+	var ch diff.Change
+	if isDelete {
+		ch.Type = diff.DELETE
+		ch.From = vlanMode
+		ch.To = nil
+	} else {
+		ch.Type = diff.CREATE
+		ch.From = nil
+		ch.To = vlanMode
+	}
+
 	ch.Path = make([]string, cmd.VlanModeEthPathItemsCountC)
 	ch.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
 	ch.Path[cmd.VlanEthIfnamePathItemIdxC] = ifname
@@ -69,11 +96,8 @@ func createVlanModeDiffChange(ifname string, vlanMode oc.E_OpenconfigVlan_VlanMo
 	return &ch
 }
 
-func createAccessVlanDiffChange(ifname string, vid uint16) *diff.Change {
-	var ch diff.Change
-	ch.Type = diff.CREATE
-	ch.From = nil
-	ch.To = vid
+func createAccessVlanDiffChange(ifname string, vid uint16, isDelete bool) *diff.Change {
+	ch := createEmptyDiffChangeWithVlanAndNilPath(vid, isDelete)
 	ch.Path = make([]string, cmd.AccessVlanEthPathItemsCountC)
 	ch.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
 	ch.Path[cmd.VlanEthIfnamePathItemIdxC] = ifname
@@ -84,11 +108,8 @@ func createAccessVlanDiffChange(ifname string, vid uint16) *diff.Change {
 	return &ch
 }
 
-func createNativeVlanDiffChange(ifname string, vid uint16) *diff.Change {
-	var ch diff.Change
-	ch.Type = diff.CREATE
-	ch.From = nil
-	ch.To = vid
+func createNativeVlanDiffChange(ifname string, vid uint16, isDelete bool) *diff.Change {
+	ch := createEmptyDiffChangeWithVlanAndNilPath(vid, isDelete)
 	ch.Path = make([]string, cmd.NativeVlanEthPathItemsCountC)
 	ch.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
 	ch.Path[cmd.VlanEthIfnamePathItemIdxC] = ifname
@@ -99,7 +120,7 @@ func createNativeVlanDiffChange(ifname string, vid uint16) *diff.Change {
 	return &ch
 }
 
-func createTrunkVlansDiffChange(ifname string, vids []oc.Interface_Ethernet_SwitchedVlan_TrunkVlans_Union) ([]diff.Change, error) {
+func createTrunkVlansDiffChange(ifname string, vids []oc.Interface_Ethernet_SwitchedVlan_TrunkVlans_Union, isDelete bool) ([]diff.Change, error) {
 	vlans := make([]uint16, 0)
 	for _, vid := range vids {
 		switch v := vid.(type) {
@@ -126,10 +147,7 @@ func createTrunkVlansDiffChange(ifname string, vids []oc.Interface_Ethernet_Swit
 
 	changes := make([]diff.Change, len(vlans))
 	for i, vid := range vlans {
-		var ch diff.Change
-		ch.Type = diff.CREATE
-		ch.From = nil
-		ch.To = vid
+		ch := createEmptyDiffChangeWithVlanAndNilPath(vid, isDelete)
 		ch.Path = make([]string, cmd.TrunkVlanEthPathItemsCountC)
 		ch.Path[cmd.VlanEthIntfPathItemIdxC] = cmd.VlanEthIntfPathItemC
 		ch.Path[cmd.VlanEthIfnamePathItemIdxC] = ifname
@@ -913,7 +931,7 @@ func (this *ConfigMngrT) setVlanEthIntf(device *oc.Device) error {
 			continue
 		}
 
-		modeChange := createVlanModeDiffChange(ethIfname, mode)
+		modeChange := createVlanModeDiffChange(ethIfname, mode, false)
 		vlanModeCmd := cmd.NewSetVlanModeEthIntfCmdT(modeChange, this.ethSwitchMgmtClient)
 		if err = this.appendCmdToTransaction(ethIfname, vlanModeCmd, setVlanModeForEthIntfC, true); err != nil {
 			return err

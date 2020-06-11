@@ -215,7 +215,6 @@ func (this *configLookupTablesT) checkDependenciesForDeleteEthIntf(ifname string
 }
 
 func (this *configLookupTablesT) checkDependenciesForSetAggIntfMember(aggIfname string, ifname string) error {
-	// TODO: Check if all dependencies from ifname is removed! Should be the same like for port breakout?
 	intfIdx, exists := this.idxByEthIfname[ifname]
 	if !exists {
 		return fmt.Errorf("Ethernet interface %s does not exists", ifname)
@@ -673,7 +672,21 @@ func (this *configLookupTablesT) checkDependenciesForDeleteTrunkVlanFromEthIntf(
 }
 
 func (this *configLookupTablesT) checkDependenciesForDeletePortBreakout(ifname string) error {
-	return this.checkDependenciesForDeleteEthIntf(ifname)
+	var err error
+	strBuilder := strings.Builder{}
+	_, exists := this.idxByEthIfname[ifname]
+	if exists {
+		msg := fmt.Sprintf("Ethernet interface %s still exist", ifname)
+		if _, err = strBuilder.WriteString(msg); err != nil {
+			return err
+		}
+	}
+
+	if strBuilder.Len() == 0 {
+		return nil
+	}
+
+	return errors.New(strBuilder.String())
 }
 
 func (this *configLookupTablesT) checkLagDependenciesDuringAdd(ifname string, aggIfname string) error {

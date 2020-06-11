@@ -11,28 +11,24 @@ import (
 	"github.com/r3labs/diff"
 )
 
-func isCreatedEthIntf(change *diff.Change) bool {
-	if change.Type != diff.CREATE {
-		return false
-	}
-
-	if change.From != nil {
-		return false
-	}
-
-	if change.To == nil {
-		return false
-	}
-
+func isCreateOrDeleteEthIntf(change *diff.Change) bool {
 	if len(change.Path) != cmd.EthIntfPathItemsCountC {
 		return false
 	}
 
-	if (change.Path[cmd.EthIntfInterfacePathItemIdxC] == cmd.EthIntfInterfacePathItemC) && strings.Contains(change.Path[cmd.EthIntfIfnamePathItemIdxC], "eth") && (change.Path[cmd.EthIntfEthernetPathItemIdxC] == cmd.EthIntfEthernetPathItemC) {
-		return true
+	if change.Path[cmd.EthIntfInterfacePathItemIdxC] != cmd.EthIntfInterfacePathItemC {
+		return false
 	}
 
-	return false
+	if !strings.Contains(change.Path[cmd.EthIntfIfnamePathItemIdxC], "eth") {
+		return false
+	}
+
+	if change.Path[cmd.EthIntfEthernetPathItemIdxC] != cmd.EthIntfEthernetPathItemC {
+		return false
+	}
+
+	return true
 }
 
 func isChangedEthIntf(change *diff.Change) bool {

@@ -14,7 +14,7 @@ import (
 	"github.com/r3labs/diff"
 )
 
-func extractIpParametersFromEthSubintfIpv4(ifname string, subintfIdx int, subintf *oc.Interface_Subinterface_Ipv4) ([]diff.Change, error) {
+func extractIpParametersFromEthSubintfIpv4(ifname string, subintfIdx int, subintf *oc.Interface_Subinterface_Ipv4, isDelete bool) ([]diff.Change, error) {
 	changes := make([]diff.Change, 0)
 	for ipAddr := range subintf.Address {
 		addr := subintf.GetAddress(ipAddr)
@@ -36,18 +36,30 @@ func extractIpParametersFromEthSubintfIpv4(ifname string, subintfIdx int, subint
 			return nil, fmt.Errorf("Missed prefix length of IPv4 address %s", ip)
 		}
 
-		changes = append(changes, *createEthSubintfIpv4IpDiffChange(ifname, subintfIdx, ip))
-		changes = append(changes, *createEthSubintfIpv4PrfxLenDiffChange(ifname, subintfIdx, ip, prfxLen))
+		changes = append(changes, *createEthSubintfIpv4IpDiffChange(ifname, subintfIdx, ip, isDelete))
+		changes = append(changes, *createEthSubintfIpv4PrfxLenDiffChange(ifname, subintfIdx, ip, prfxLen, isDelete))
 	}
 
 	return changes, nil
 }
 
-func createEthSubintfIpv4IpDiffChange(ifname string, subintfIdx int, ip string) *diff.Change {
+func createEmptyDiffChangeWithNilPath(obj interface{}, isDelete bool) diff.Change {
 	var ch diff.Change
-	ch.Type = diff.CREATE
-	ch.From = nil
-	ch.To = ip
+	if isDelete {
+		ch.Type = diff.DELETE
+		ch.From = obj
+		ch.To = nil
+	} else {
+		ch.Type = diff.CREATE
+		ch.From = nil
+		ch.To = obj
+	}
+
+	return ch
+}
+
+func createEthSubintfIpv4IpDiffChange(ifname string, subintfIdx int, ip string, isDelete bool) *diff.Change {
+	ch := createEmptyDiffChangeWithNilPath(ip, isDelete)
 	ch.Path = make([]string, cmd.Ipv4AddrEthPathItemsCountC)
 	ch.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] = cmd.Ipv4AddrEthIntfPathItemC
 	ch.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] = ifname
@@ -61,11 +73,8 @@ func createEthSubintfIpv4IpDiffChange(ifname string, subintfIdx int, ip string) 
 	return &ch
 }
 
-func createEthSubintfIpv4PrfxLenDiffChange(ifname string, subintfIdx int, ip string, prfxLen *uint8) *diff.Change {
-	var ch diff.Change
-	ch.Type = diff.CREATE
-	ch.From = nil
-	ch.To = prfxLen
+func createEthSubintfIpv4PrfxLenDiffChange(ifname string, subintfIdx int, ip string, prfxLen *uint8, isDelete bool) *diff.Change {
+	ch := createEmptyDiffChangeWithNilPath(prfxLen, isDelete)
 	ch.Path = make([]string, cmd.Ipv4AddrEthPathItemsCountC)
 	ch.Path[cmd.Ipv4AddrEthIntfPathItemIdxC] = cmd.Ipv4AddrEthIntfPathItemC
 	ch.Path[cmd.Ipv4AddrEthIfnamePathItemIdxC] = ifname
@@ -79,19 +88,7 @@ func createEthSubintfIpv4PrfxLenDiffChange(ifname string, subintfIdx int, ip str
 	return &ch
 }
 
-func isCreateEthSubintfIpv4(change *diff.Change) bool {
-	if change.Type != diff.CREATE {
-		return false
-	}
-
-	if change.From != nil {
-		return false
-	}
-
-	if change.To == nil {
-		return false
-	}
-
+func isCreateOrDeleteEthSubintfIpv4(change *diff.Change) bool {
 	if len(change.Path) != cmd.Ipv4AddrEthSubintfIpv4ItemsCountC {
 		return false
 	}
@@ -383,7 +380,17 @@ func (this *ConfigMngrT) validateDeleteIpv4AddrEthIntf(changeItem *DiffChangeMgm
 		return fmt.Errorf("Unable to get IPv4 address change")
 	}
 
-	cidr := fmt.Sprintf("%s/%d", *ipChangeItem.Change.From.(*string), *prfxLenChangeItem.Change.From.(*uint8))
+	ip, err := utils.ConvertGoInterfaceIntoString(ipChangeItem.Change.From)
+	if err != nil {
+		return err
+	}
+
+	prfxLen, err := utils.ConvertGoInterfaceIntoUint8(prfxLenChangeItem.Change.From)
+	if err != nil {
+		return err
+	}
+
+	cidr := fmt.Sprintf("%s/%d", ip, prfxLen)
 	log.Infof("Requested delete IPv4 address %s from Ethernet interface %s", cidr, ifname)
 	deleteIpv4AddrEthIntfCmd := cmd.NewDeleteIpv4AddrEthIntfCmdT(ipChangeItem.Change, prfxLenChangeItem.Change, this.ethSwitchMgmtClient)
 	if err := this.transConfigLookupTbl.checkDependenciesForDeleteIpv4AddrFromEthIntf(ifname, cidr); err != nil {
