@@ -164,6 +164,14 @@
         }
       },
       {
+        "name": "ae-4",
+        "aggregation": {
+          "config": {
+            "lag-type": "STATIC"
+          }
+        }
+      },
+      {
         "name": "eth-1/1",
         "config": {
           "description": "QSFP28 No. 1 port with breakout mode capability",

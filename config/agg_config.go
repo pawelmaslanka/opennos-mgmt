@@ -401,6 +401,10 @@ func (this *ConfigMngrT) setAggIntf(device *oc.Device) error {
 func (this *ConfigMngrT) setAggIntfMember(device *oc.Device) error {
 	var err error
 	for aggIdx, aggIfname := range this.configLookupTbl.aggIfnameByIdx {
+		if _, exists := this.configLookupTbl.ethByAgg[aggIdx]; !exists {
+			continue
+		}
+
 		for _, ethIdx := range this.configLookupTbl.ethByAgg[aggIdx].IdxTs() {
 			var change diff.Change
 			change.Type = diff.CREATE

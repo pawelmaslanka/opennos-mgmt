@@ -1397,7 +1397,7 @@ func (t *configLookupTablesT) dump() {
 
 	log.Infoln("========================================")
 	lags := make([]string, 0)
-	for aggIfname, _ := range t.idxByAggIfname {
+	for aggIfname := range t.idxByAggIfname {
 		lags = append(lags, aggIfname)
 	}
 	sort.Strings(lags)
@@ -1405,6 +1405,10 @@ func (t *configLookupTablesT) dump() {
 	log.Infoln("Print list of LAG interfaces and their members:")
 	for _, aggIfname := range lags {
 		log.Infof("%s", aggIfname)
+		if _, exists := t.ethByAgg[t.idxByAggIfname[aggIfname]]; !exists {
+			continue
+		}
+
 		for _, ethIntf := range t.ethByAgg[t.idxByAggIfname[aggIfname]].IdxTs() {
 			log.Infof("  %s", t.ethIfnameByIdx[ethIntf])
 		}
