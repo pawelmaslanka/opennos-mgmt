@@ -5,7 +5,6 @@ import (
 	"fmt"
 	cmd "opennos-mgmt/config/command"
 	"opennos-mgmt/gnmi/modeldata/oc"
-	"regexp"
 
 	log "github.com/golang/glog"
 	"github.com/r3labs/diff"
@@ -364,20 +363,25 @@ func (this *ConfigMngrT) processSetPortBreakoutChanSpeedFromChangelog(changelog 
 	return nil
 }
 
-func (this *ConfigMngrT) setPortBreakout(device *oc.Device) error {
+func (this *ConfigMngrT) initPortBreakout(device *oc.Device) error {
+	components := device.Component
+	if len(components) == 0 {
+		return nil
+	}
+
 	var err error
-	for _, ethIfname := range this.configLookupTbl.ethIfnameByIdx {
-		// We want to process only not splitted ports
-		rgx := regexp.MustCompile(`eth-|/`)
-		tokens := rgx.Split(ethIfname, -1)
-		if len(tokens) == 4 { // breakout mode enable
-			continue
+	for _, comp := range components {
+		ifname := comp.GetName()
+		if len(ifname) == 0 {
+			return nil
 		}
 
-		comp := device.GetComponent(ethIfname)
-		if comp == nil {
-			continue
-		}
+		// We want to process only not splitted ports
+		// rgx := regexp.MustCompile(`eth-|/`)
+		// tokens := rgx.Split(ifname, -1)
+		// if len(tokens) == 4 { // breakout mode enable
+		// 	continue
+		// }
 
 		port := comp.GetPort()
 		if port == nil {
@@ -391,16 +395,28 @@ func (this *ConfigMngrT) setPortBreakout(device *oc.Device) error {
 
 		numChannels := mode.GetNumChannels()
 		if numChannels == uint8(cmd.PortBreakoutModeInvalidC) {
-			return fmt.Errorf("number of channels of port %s is unset", ethIfname)
+			return fmt.Errorf("number of channels of port %s is unset", ifname)
 		}
 
 		if numChannels == uint8(cmd.PortBreakoutModeNoneC) {
+			for i := 1; i <= 4; i++ {
+				slaveIfname := fmt.Sprintf("%s/%d", ifname, i)
+				log.Infof("Composed slave port: %s", slaveIfname)
+				if _, exists := this.configLookupTbl.idxByEthIfname[slaveIfname]; exists {
+					return fmt.Errorf("invalid configuration because there is not active breakout port on Ethernet interface %s and slave port %s exists", ifname, slaveIfname)
+				}
+			}
+
 			continue
+		} else if numChannels == uint8(cmd.PortBreakoutMode4xC) {
+			if _, exists := this.configLookupTbl.idxByEthIfname[ifname]; exists {
+				return fmt.Errorf("invalid configuration because there is active breakout port on Ethernet interface %s and master port exists", ifname)
+			}
 		}
 
 		chanSpeed := mode.GetChannelSpeed()
 		if chanSpeed == oc.OpenconfigIfEthernet_ETHERNET_SPEED_UNSET {
-			return fmt.Errorf("channel speed of port %s is unset", ethIfname)
+			return fmt.Errorf("channel speed of port %s is unset", ifname)
 		}
 
 		var numChanChange diff.Change
@@ -409,7 +425,7 @@ func (this *ConfigMngrT) setPortBreakout(device *oc.Device) error {
 		numChanChange.To = numChannels
 		numChanChange.Path = make([]string, cmd.PortBreakoutPathItemsCountC)
 		numChanChange.Path[cmd.PortBreakoutCompPathItemIdxC] = cmd.PortBreakoutCompPathItemC
-		numChanChange.Path[cmd.PortBreakoutIfnamePathItemIdxC] = ethIfname
+		numChanChange.Path[cmd.PortBreakoutIfnamePathItemIdxC] = ifname
 		numChanChange.Path[cmd.PortBreakoutPortPathItemIdxC] = cmd.PortBreakoutPortPathItemC
 		numChanChange.Path[cmd.PortBreakoutModePathItemIdxC] = cmd.PortBreakoutModePathItemC
 		numChanChange.Path[cmd.PortBreakoutNumChanPathItemIdxC] = cmd.PortBreakoutNumChanPathItemC
@@ -420,13 +436,13 @@ func (this *ConfigMngrT) setPortBreakout(device *oc.Device) error {
 		chanSpeedChange.To = chanSpeed
 		chanSpeedChange.Path = make([]string, cmd.PortBreakoutPathItemsCountC)
 		chanSpeedChange.Path[cmd.PortBreakoutCompPathItemIdxC] = cmd.PortBreakoutCompPathItemC
-		chanSpeedChange.Path[cmd.PortBreakoutIfnamePathItemIdxC] = ethIfname
+		chanSpeedChange.Path[cmd.PortBreakoutIfnamePathItemIdxC] = ifname
 		chanSpeedChange.Path[cmd.PortBreakoutPortPathItemIdxC] = cmd.PortBreakoutPortPathItemC
 		chanSpeedChange.Path[cmd.PortBreakoutModePathItemIdxC] = cmd.PortBreakoutModePathItemC
 		chanSpeedChange.Path[cmd.PortBreakoutChanSpeedPathItemIdxC] = cmd.PortBreakoutChanSpeedPathItemC
 
 		command := cmd.NewSetPortBreakoutCmdT(&numChanChange, &chanSpeedChange, this.ethSwitchMgmtClient)
-		if err = this.appendCmdToTransaction(ethIfname, command, setPortBreakoutC, false); err != nil {
+		if err = this.appendCmdToTransaction(ifname, command, setPortBreakoutC, false); err != nil {
 			return err
 		}
 	}

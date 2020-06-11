@@ -415,50 +415,6 @@
         }
       },
       {
-        "name": "eth-1/6",
-        "config": {
-          "description": "QSFP28 No. 6 port with breakout mode capability",
-          "mtu": 9412
-        },
-        "ethernet": {
-          "config": {
-            "auto-negotiate": false,
-            "mac-address": "01:02:03:04:05:16",
-            "port-speed": "SPEED_100GB"
-          },
-          "switched-vlan": {
-            "config": {
-            }
-          }
-        },
-        "subinterfaces": {
-          "subinterface": [
-            {
-              "index": 0,
-              "config": {
-                "description": "Master port",
-                "enabled": true
-              },
-              "ipv4": {
-                "addresses": {
-                  "address": [
-                    {
-                      "config": {
-                        "ip": "10.0.10.16",
-                        "prefix-length": 24
-                      }
-                    }
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        "state": {
-          "admin-status": "UP"
-        }
-      },
-      {
         "name": "eth-1/6/1",
         "config": {
           "description": "QSFP28 No. 6 port with breakout mode capability",

@@ -346,7 +346,7 @@ func (this *ConfigMngrT) configureDevice(configModel *ygot.ValidatedGoStruct) er
 		return err
 	}
 
-	if err = this.setPortBreakout(device); err != nil {
+	if err = this.initPortBreakout(device); err != nil {
 		return err
 	}
 
