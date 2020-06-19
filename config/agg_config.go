@@ -17,6 +17,26 @@ const (
 	idDeleteAggIntfMemberNameFmt = "sm-%s"
 )
 
+func isCreateOrDeleteAggIntf(change *diff.Change) bool {
+	if len(change.Path) != cmd.AggIntfPathItemsCountC {
+		return false
+	}
+
+	if change.Path[cmd.AggIntfInterfacePathItemIdxC] != cmd.AggIntfInterfacePathItemC {
+		return false
+	}
+
+	if !strings.Contains(change.Path[cmd.AggIntfIfnamePathItemIdxC], "ae") {
+		return false
+	}
+
+	if change.Path[cmd.AggIntfAggregationPathItemIdxC] != cmd.AggIntfAggregationPathItemC {
+		return false
+	}
+
+	return true
+}
+
 func extractAggIdFromEthIntf(ethIfname string, ethIntf *oc.Interface_Ethernet, isDelete bool) ([]diff.Change, error) {
 	changes := make([]diff.Change, 0)
 	aggIfname := ethIntf.GetAggregateId()
@@ -30,6 +50,33 @@ func extractAggIdFromEthIntf(ethIfname string, ethIntf *oc.Interface_Ethernet, i
 	}
 
 	return changes, nil
+}
+
+func extractAggIntfLagType(ifname string, aggIntf *oc.Interface_Aggregation, isDelete bool) ([]diff.Change, error) {
+	changes := make([]diff.Change, 0)
+	lagType := aggIntf.GetLagType()
+	fmt.Printf("Found lag type %d for %s\n", lagType, ifname)
+	if !isDelete {
+		changes = append(changes, *createAggIntfLagTypeDiffChange(ifname, lagType))
+	}
+
+	return changes, nil
+}
+
+func createAggIntfLagTypeDiffChange(ifname string, lagType oc.E_OpenconfigIfAggregate_AggregationType) *diff.Change {
+	var ch diff.Change
+	ch.Type = diff.CREATE
+	ch.From = nil
+	ch.To = lagType
+	ch.Path = make([]string, cmd.AggIntfMemberPathItemsCountC)
+	ch.Path[cmd.AggIntfInterfacePathItemIdxC] = cmd.AggIntfInterfacePathItemC
+	ch.Path[cmd.AggIntfIfnamePathItemIdxC] = ifname
+	ch.Path[cmd.AggIntfAggregationPathItemIdxC] = cmd.AggIntfAggregationPathItemC
+	ch.Path[cmd.AggIntfLagTypePathItemIdxC] = cmd.AggIntfLagTypePathItemC
+
+	fmt.Printf("Aggregate interface diff change:\n%v\n", ch)
+
+	return &ch
 }
 
 func createAggIntfMemberDiffChange(ethIfname string, aggIfname string) *diff.Change {
@@ -64,6 +111,10 @@ func deleteAggIntfMemberDiffChange(ethIfname string, aggIfname string) *diff.Cha
 	return &ch
 }
 
+func isCreateOrDeleteAggIntfAggregation(change *diff.Change) bool {
+	return isCreateOrDeleteAggIntf(change)
+}
+
 func isChangedAggIntfMember(change *diff.Change) bool {
 	if len(change.Path) != cmd.AggIntfMemberPathItemsCountC {
 		return false
@@ -86,6 +137,30 @@ func isChangedAggIntf(change *diff.Change) bool {
 	}
 
 	return false
+}
+
+func isChangedAggIntfLagType(change *diff.Change) bool {
+	if len(change.Path) != cmd.AggIntfLagTypePathItemsCountC {
+		return false
+	}
+
+	if change.Path[cmd.AggIntfInterfacePathItemIdxC] != cmd.AggIntfInterfacePathItemC {
+		return false
+	}
+
+	if !strings.Contains(change.Path[cmd.AggIntfIfnamePathItemIdxC], "ae") {
+		return false
+	}
+
+	if change.Path[cmd.AggIntfAggregationPathItemIdxC] != cmd.AggIntfAggregationPathItemC {
+		return false
+	}
+
+	if change.Path[cmd.AggIntfLagTypePathItemIdxC] != cmd.AggIntfLagTypePathItemC {
+		return false
+	}
+
+	return true
 }
 
 func (this *ConfigMngrT) validateSetAggIntfMemberChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
@@ -181,6 +256,22 @@ func (this *ConfigMngrT) validateDeleteAggIntfMemberChange(changeItem *DiffChang
 	return nil
 }
 
+func (this *ConfigMngrT) validateSetAggIntfLagTypeChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+	aggIfname, err := utils.ConvertGoInterfaceIntoString(changeItem.Change.To)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("Requested set aggregate interface LAG type %s", aggIfname)
+	if changeItem.Change.Type == diff.UPDATE {
+		return fmt.Errorf("Dependency error: Transitions LAG type between LACP and STATIC for aggregate interface %s is not supported. Please re-create current aggregate interface", aggIfname)
+	}
+
+	changeItem.MarkAsProcessed()
+
+	return nil
+}
+
 func (this *ConfigMngrT) validateSetAggIntfChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
 	aggIfname, err := utils.ConvertGoInterfaceIntoString(changeItem.Change.To)
 	if err != nil {
@@ -188,7 +279,42 @@ func (this *ConfigMngrT) validateSetAggIntfChange(changeItem *DiffChangeMgmtT, c
 	}
 
 	log.Infof("Requested set LAG interface %s", aggIfname)
-	setAggIntfCmd := cmd.NewSetAggIntfCmdT(changeItem.Change, this.ethSwitchMgmtClient)
+	device := (*this.transCandidateConfig).(*oc.Device)
+	aggIntf := device.GetInterface(aggIfname)
+	if aggIntf == nil {
+		return fmt.Errorf("Cannot find aggregate interface %s in config", aggIfname)
+	}
+
+	aggregation := aggIntf.GetAggregation()
+	if aggregation == nil {
+		return fmt.Errorf("Cannot find aggregation settings for aggregate interface %s in config", aggIfname)
+	}
+
+	if aggregation.LagType == oc.OpenconfigIfAggregate_AggregationType_UNSET {
+		return fmt.Errorf("LAG type for aggregate interface %s cannot be unset", aggIfname)
+	} else if aggregation.LagType == oc.OpenconfigIfAggregate_AggregationType_LACP {
+		lacp := device.GetLacp()
+		if lacp == nil {
+			return fmt.Errorf("Cannot find LACP configuration which is required for aggregate interface %s as LACP type", aggIfname)
+		}
+
+		lacpIntf := lacp.GetInterface(aggIfname)
+		if lacpIntf == nil {
+			return fmt.Errorf("Cannot find corresponding LACP configuration to aggregate interface %s in config", aggIfname)
+		}
+
+		// Delegate to create aggregate interface to LACP config module
+		changeItem.MarkAsProcessed()
+		return nil
+	}
+
+	lagTypeChange, err := this.findAggIntfLagTypeFromChangelog(aggIfname, changelog)
+	if err != nil {
+		return err
+	}
+
+	// Create static aggregate interface
+	setAggIntfCmd := cmd.NewSetAggIntfCmdT(changeItem.Change, lagTypeChange.Change, this.ethSwitchMgmtClient)
 	if err := this.transConfigLookupTbl.checkDependenciesForSetAggIntf(aggIfname); err != nil {
 		return fmt.Errorf("Cannot %q because there are dependencies from LAG interface %s:\n%s",
 			setAggIntfCmd.GetName(), aggIfname, err)
@@ -205,8 +331,30 @@ func (this *ConfigMngrT) validateSetAggIntfChange(changeItem *DiffChangeMgmtT, c
 	}
 
 	changeItem.MarkAsProcessed()
+	lagTypeChange.MarkAsProcessed()
 
 	return nil
+}
+
+func (this *ConfigMngrT) findAggIntfLagTypeFromChangelog(ifname string, changelog *DiffChangelogMgmtT) (*DiffChangeMgmtT, error) {
+	var err error = nil
+	var changeItem *DiffChangeMgmtT
+	lagType := oc.OpenconfigIfAggregate_AggregationType_UNSET
+	for _, ch := range changelog.Changes {
+		if isChangedAggIntfLagType(ch.Change) {
+			if ch.Change.Path[cmd.AggIntfIfnamePathItemIdxC] == ifname {
+				lagType = ch.Change.To.(oc.E_OpenconfigIfAggregate_AggregationType)
+				changeItem = ch
+				break
+			}
+		}
+	}
+
+	if lagType == oc.OpenconfigIfAggregate_AggregationType_UNSET {
+		err = fmt.Errorf("Could not found set LAG type request")
+	}
+
+	return changeItem, err
 }
 
 func (this *ConfigMngrT) validateDeleteAggIntfChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
@@ -285,6 +433,22 @@ func findSetAggIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmt
 	return nil, false
 }
 
+func findSetAggIntfLagTypeChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
+	for _, ch := range changelog.Changes {
+		if !ch.IsProcessed() {
+			if ch.Change.Type != diff.DELETE {
+				if isChangedAggIntfLagType(ch.Change) {
+					if ch.Change.To != nil {
+						return ch, true
+					}
+				}
+			}
+		}
+	}
+
+	return nil, false
+}
+
 func findDeleteAggIntfChange(changelog *DiffChangelogMgmtT) (change *DiffChangeMgmtT, exists bool) {
 	for _, ch := range changelog.Changes {
 		if !ch.IsProcessed() {
@@ -329,6 +493,25 @@ func (this *ConfigMngrT) processDeleteAggIntfMemberFromChangelog(changelog *Diff
 		// Repeat till there is not any change related to delete LAG interface member
 		if change, exists := findDeleteAggIntfMemberChange(changelog); exists {
 			if err := this.validateDeleteAggIntfMemberChange(change, changelog); err != nil {
+				return err
+			}
+		} else {
+			break
+		}
+	}
+
+	return nil
+}
+
+func (this *ConfigMngrT) processSetAggIntfLagTypeFromChangelog(changelog *DiffChangelogMgmtT) error {
+	if changelog.isProcessed() {
+		return nil
+	}
+
+	for {
+		// Repeat till there is not any change related to set aggregate interface LAG type
+		if change, exists := findSetAggIntfLagTypeChange(changelog); exists {
+			if err := this.validateSetAggIntfChange(change, changelog); err != nil {
 				return err
 			}
 		} else {
@@ -389,7 +572,17 @@ func (this *ConfigMngrT) setAggIntf(device *oc.Device) error {
 		change.Path[cmd.AggIntfIfnamePathItemIdxC] = aggIfname
 		change.Path[cmd.AggIntfNamePathItemIdxC] = cmd.AggIntfNamePathItemC
 
-		command := cmd.NewSetAggIntfCmdT(&change, this.ethSwitchMgmtClient)
+		var lagTypeCh diff.Change
+		lagTypeCh.Type = diff.CREATE
+		lagTypeCh.From = nil
+		lagTypeCh.To = device.GetInterface(aggIfname).GetAggregation().LagType
+		lagTypeCh.Path = make([]string, cmd.AggIntfLagTypePathItemsCountC)
+		lagTypeCh.Path[cmd.AggIntfInterfacePathItemIdxC] = cmd.AggIntfInterfacePathItemC
+		lagTypeCh.Path[cmd.AggIntfIfnamePathItemIdxC] = aggIfname
+		lagTypeCh.Path[cmd.AggIntfAggregationPathItemIdxC] = cmd.AggIntfAggregationPathItemC
+		lagTypeCh.Path[cmd.AggIntfLagTypePathItemIdxC] = cmd.AggIntfLagTypePathItemC
+
+		command := cmd.NewSetAggIntfCmdT(&change, &lagTypeCh, this.ethSwitchMgmtClient)
 		if err = this.appendCmdToTransaction(aggIfname, command, setAggIntfC, true); err != nil {
 			return err
 		}

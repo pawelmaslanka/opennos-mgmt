@@ -44,6 +44,25 @@ func ConvertGoInterfaceIntoString(valueToConvert interface{}) (string, error) {
 	return value, nil
 }
 
+// ConvertGoInterfaceIntoUint64 converts Go interface{} into int64 value
+func ConvertGoInterfaceIntoInt64(valueToConvert interface{}) (int64, error) {
+	var value int64
+	switch v := valueToConvert.(type) {
+	case *oc.E_OpenconfigIfAggregate_AggregationType:
+		value = int64(*v)
+	case oc.E_OpenconfigIfAggregate_AggregationType:
+		value = int64(v)
+	case *int64:
+		value = *v
+	case int64:
+		value = v
+	default:
+		return 0, fmt.Errorf("Cannot convert %v to any of [int64, oc.E_OpenconfigIfAggregate_AggregationType], unsupported type, got: %T", v, v)
+	}
+
+	return value, nil
+}
+
 // ConvertGoInterfaceIntoUint16 converts Go interface{} into uint16 value
 func ConvertGoInterfaceIntoUint16(valueToConvert interface{}) (uint16, error) {
 	var value uint16

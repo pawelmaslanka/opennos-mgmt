@@ -34,9 +34,9 @@ type SetEthIntfCmdT struct {
 }
 
 // NewSetEthIntfCmdT creates new instance of SetEthIntfCmdT type
-func NewSetEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetEthIntfCmdT {
+func NewSetEthIntfCmdT(change *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *SetEthIntfCmdT {
 	changes := make([]*diff.Change, maxEthChangeIdxC)
-	changes[ethChangeIdxC] = vlan
+	changes[ethChangeIdxC] = change
 	return &SetEthIntfCmdT{
 		commandT: newCommandT("set ethernet interface", changes, ethSwitchMgmt),
 	}
@@ -79,9 +79,9 @@ type DeleteEthIntfCmdT struct {
 }
 
 // NewDeleteEthIntfCmdT creates new instance of DeleteEthIntfCmdT type
-func NewDeleteEthIntfCmdT(vlan *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *DeleteEthIntfCmdT {
+func NewDeleteEthIntfCmdT(change *diff.Change, ethSwitchMgmt *mgmt.EthSwitchMgmtClient) *DeleteEthIntfCmdT {
 	changes := make([]*diff.Change, maxEthChangeIdxC)
-	changes[ethChangeIdxC] = vlan
+	changes[ethChangeIdxC] = change
 	return &DeleteEthIntfCmdT{
 		commandT: newCommandT("delete ethernet interface", changes, ethSwitchMgmt),
 	}

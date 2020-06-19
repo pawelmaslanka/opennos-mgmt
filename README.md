@@ -71,8 +71,9 @@ gnmi_capabilities \
 ```
 
 ### TODO
-Withdrawing breakout port mode should depend on if slave ports still exists
 Shouldn't be port breakout responsible for creating and destroying Ethernet interface?
-During removing Ethernet interface there should be check all dependencies from this interface
-Before disable port breakout check if all slave interfaces are removed
-Before enable port breakout check if master port has been removed
+If we create new Aggregate interface and it is STATIC, then send request to Ethernet Management Service.
+If we create new Aggregate interface and it is DYNAMIC, then send request to Ethernet Management Service. LACP interface have to be created alongside LAG dynamic request!!!
+If we create new Aggregate interface and LAG type is not set, then return invalid configuration.
+If create new Ethernet interface then at least speed should be defined as dependency!
+If create LAG then check speed of all members!

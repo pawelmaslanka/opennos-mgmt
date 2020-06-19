@@ -43,7 +43,9 @@ const (
 	deleteEthIntfFromAggIntfC                       // Remove Ethernet interface from LAG membership
 	deleteAggIntfParamsC                            // Remove LAG parameters
 	deleteAggIntfMemberC                            // Remove Ethernet interface from LAG
-	deleteAggIntfLacpC                              // Disable LACP protocol for aggregate interface
+	deleteLacpModeC                                 // Remove LACP activity - active or passive
+	deleteLacpIntervalC                             // Delete the period between LACP messages
+	deleteLacpC                                     // Disable LACP protocol for aggregate interface
 	deleteAggIntfC                                  // Delete LAG interface
 	deleteEthIntfC                                  // Delete Ethernet interface
 	deletePortBreakoutC                             // Combine multiple logical ports into single port
@@ -55,7 +57,10 @@ const (
 	setPortMtuForEthIntfC                           // Set MTU on port
 	setPortSpeedForEthIntfC                         // Set port speed
 	setAggIntfC                                     // Create new LAG interface
-	setAggIntfLacpC                                 // Enable LACP protocol for aggregate interface
+	setAggIntfLagTypeC                              // Set the type of LAG
+	setLacpC                                        // Enable LACP protocol for aggregate interface
+	setLacpIntervalC                                // Set the period between LACP messages
+	setLacpModeC                                    // Set LACP activity - active or passive
 	setAggIntfParamsC                               // Set LAG parameters
 	setAggIntfMemberC                               // Add Ethernet interface to LAG
 	setVlanC                                        // Create new VLAN
@@ -71,9 +76,6 @@ const (
 	setIpv4AddrForAggIntfC                          // Assign IPv4/CIDRv4 address to LAG interface
 	setIpv6AddrForEthIntfC                          // Assign IPv6/CIDRv6 address to Ethernet interface
 	setIpv6AddrForAggIntfC                          // Assign IPv6/CIDRv6 address to LAG interface
-	setLagTypeOfAggIntfC                            // Set the type of LAG
-	setLacpIntervalC                                // Set the period between LACP messages
-	setLacpModeC                                    // Set LACP activity - active or passive
 	maxNumberOfActionsInTransactionC                // Defines maximum number of possible actions in transaction
 )
 
@@ -107,12 +109,12 @@ type ConfigMngrT struct {
 	// transactions    [TransactionIdx][maxNumberOfActionsInTransactionC]cmdByNameT
 	// transConfigLookupTbl every queued command should remove dependency from here
 	// e.g. when LAG is going to be remove, we should remove ports from this LAG, and LAG itself
-	transConfigLookupTbl             *configLookupTablesT
-	transCmdList                     *list.List
-	transConfirmationTimeoutCtx      context.Context
-	transConfirmationCancel          context.CancelFunc
-	transConfirmationCandidateConfig *ygot.ValidatedGoStruct
-	transHasBeenStarted              bool // marks if transaction has been started
+	transConfigLookupTbl        *configLookupTablesT
+	transCmdList                *list.List
+	transConfirmationTimeoutCtx context.Context
+	transConfirmationCancel     context.CancelFunc
+	transCandidateConfig        *ygot.ValidatedGoStruct
+	transHasBeenStarted         bool // marks if transaction has been started
 }
 
 // NewConfigMngrT creates instance of ConfigMngrT object
@@ -202,7 +204,7 @@ func (this *ConfigMngrT) Confirm() error {
 		return errors.New("Transaction has not been started")
 	}
 
-	candidateConfig := this.transConfirmationCandidateConfig
+	candidateConfig := this.transCandidateConfig
 	this.configLookupTbl = this.transConfigLookupTbl.makeCopy()
 	this.DiscardOrFinishTrans()
 	return this.CommitCandidateConfig(candidateConfig)
@@ -219,7 +221,7 @@ func (this *ConfigMngrT) DiscardOrFinishTrans() error {
 	// Check context before clean all related data
 	this.transConfirmationTimeoutCtx = nil
 	this.transConfirmationCancel = nil
-	this.transConfirmationCandidateConfig = nil
+	this.transCandidateConfig = nil
 	this.transHasBeenStarted = false
 	return nil
 }
@@ -256,8 +258,8 @@ func (this *ConfigMngrT) LoadConfig(model *gnmi.Model, config []byte) error {
 		intf := device.Interface[ifname]
 		if agg := intf.GetAggregation(); agg != nil {
 			if agg.GetLagType() == oc.OpenconfigIfAggregate_AggregationType_UNSET {
-				return fmt.Errorf("Invalid LAG type on interface %s",
-					ifname, err)
+				return fmt.Errorf("LAG type for aggregate interface %s cannot be unset",
+					ifname)
 			}
 
 			if err = this.configLookupTbl.addNewAggIntfIfItDoesNotExist(ifname); err != nil {
@@ -526,17 +528,17 @@ func extractCreateEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, err
 		changes = append(changes, newChanges...)
 	}
 
-	*changelog = append(*changelog, changes...)
+	var newChangeLog diff.Changelog
+	newChangeLog = changes
+	// *changelog = append(*changelog, changes...)
 
-	return changelog, nil
+	return &newChangeLog, nil
 }
 
 func extractDeleteEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, error) {
 	changes := make([]diff.Change, 0)
 	var err error
 	for _, ch := range *changelog {
-		fmt.Printf("Delete change \n%v\n", ch)
-
 		if !isDeleteDiffChange(&ch) {
 			continue
 		}
@@ -587,9 +589,43 @@ func extractDeleteEthIntfParams(changelog *diff.Changelog) (*diff.Changelog, err
 		changes = append(changes, newChanges...)
 	}
 
-	*changelog = append(*changelog, changes...)
+	var newChangeLog diff.Changelog
+	newChangeLog = changes
+	// *changelog = append(*changelog, changes...)
 
-	return changelog, nil
+	return &newChangeLog, nil
+}
+
+func extractCreateAggIntfAggregationParams(changelog *diff.Changelog) (*diff.Changelog, error) {
+	changes := make([]diff.Change, 0)
+	var err error
+	for _, ch := range *changelog {
+		if !isCreateDiffChange(&ch) {
+			continue
+		}
+
+		var newChanges []diff.Change
+		if isCreateOrDeleteAggIntfAggregation(&ch) {
+			newAggIntfParamChanges := make([]diff.Change, 0)
+			ifname := ch.Path[cmd.EthIntfIfnamePathItemIdxC]
+			isDelete := false
+			aggIntf := ch.To.(*oc.Interface_Aggregation)
+			if newAggIntfParamChanges, err = extractAggIntfLagType(ifname, aggIntf, isDelete); err != nil {
+				return nil, err
+			}
+
+			if len(newAggIntfParamChanges) > 0 {
+				newChanges = append(newChanges, newAggIntfParamChanges...)
+			}
+		}
+
+		changes = append(changes, newChanges...)
+	}
+
+	var newChangeLog diff.Changelog
+	newChangeLog = changes
+
+	return &newChangeLog, nil
 }
 
 func isCreateDiffChange(change *diff.Change) bool {
@@ -626,12 +662,22 @@ func isDeleteDiffChange(change *diff.Change) bool {
 
 func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateConfig *ygot.ValidatedGoStruct) error {
 	var err error
-	if changelog, err = extractCreateEthIntfParams(changelog); err != nil {
+	if newChanges, err := extractCreateEthIntfParams(changelog); err == nil {
+		*changelog = append(*changelog, *newChanges...)
+	} else {
 		return fmt.Errorf("Failed to extract new Ethernet interface parameters from changelog: %s", err)
 	}
 
-	if changelog, err = extractDeleteEthIntfParams(changelog); err != nil {
-		return fmt.Errorf("Failed to extract new Ethernet interface parameters from changelog: %s", err)
+	if newChanges, err := extractDeleteEthIntfParams(changelog); err == nil {
+		*changelog = append(*changelog, *newChanges...)
+	} else {
+		return fmt.Errorf("Failed to extract delete Ethernet interface parameters from changelog: %s", err)
+	}
+
+	if newChanges, err := extractCreateAggIntfAggregationParams(changelog); err == nil {
+		*changelog = append(*changelog, *newChanges...)
+	} else {
+		return fmt.Errorf("Failed to extract create agregate interface parameters from changelog: %s", err)
 	}
 
 	diffChangelog := NewDiffChangelogMgmtT(changelog)
@@ -676,6 +722,8 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 		this.transConfigLookupTbl = this.configLookupTbl.makeCopy()
 	}
 
+	this.transCandidateConfig = candidateConfig
+
 	if err = this.parseChangelogAndConvertToCommands(diffChangelog); err != nil {
 		this.DiscardOrFinishTrans()
 		return err
@@ -701,7 +749,6 @@ func (this *ConfigMngrT) CommitChangelog(changelog *diff.Changelog, candidateCon
 			return err
 		}
 
-		this.transConfirmationCandidateConfig = candidateConfig
 		this.transConfirmationTimeoutCtx, this.transConfirmationCancel = context.WithCancel(context.Background())
 		go this.startCountingForConfirmationTimeout(&this.transConfirmationTimeoutCtx, commitConfirmTimeout)
 
