@@ -813,6 +813,9 @@ func (this *ConfigMngrT) parseChangelogAndConvertToCommands(diffChangelog *DiffC
 		if err = this.processSetAggIntfFromChangelog(diffChangelog); err != nil {
 			return err
 		}
+		if err = this.processSetAggIntfLagTypeFromChangelog(diffChangelog); err != nil {
+			return err
+		}
 		if err = this.processSetAggIntfMemberFromChangelog(diffChangelog); err != nil {
 			return err
 		}

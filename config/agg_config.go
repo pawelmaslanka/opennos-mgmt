@@ -257,11 +257,7 @@ func (this *ConfigMngrT) validateDeleteAggIntfMemberChange(changeItem *DiffChang
 }
 
 func (this *ConfigMngrT) validateSetAggIntfLagTypeChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
-	aggIfname, err := utils.ConvertGoInterfaceIntoString(changeItem.Change.To)
-	if err != nil {
-		return err
-	}
-
+	aggIfname := changeItem.Change.Path[cmd.AggIntfIfnamePathItemIdxC]
 	log.Infof("Requested set aggregate interface LAG type %s", aggIfname)
 	if changeItem.Change.Type == diff.UPDATE {
 		return fmt.Errorf("Dependency error: Transitions LAG type between LACP and STATIC for aggregate interface %s is not supported. Please re-create current aggregate interface", aggIfname)
@@ -273,6 +269,7 @@ func (this *ConfigMngrT) validateSetAggIntfLagTypeChange(changeItem *DiffChangeM
 }
 
 func (this *ConfigMngrT) validateSetAggIntfChange(changeItem *DiffChangeMgmtT, changelog *DiffChangelogMgmtT) error {
+	log.Infof("validateSetAggIntfChange:\n%v\n", changeItem.Change)
 	aggIfname, err := utils.ConvertGoInterfaceIntoString(changeItem.Change.To)
 	if err != nil {
 		return err
@@ -511,7 +508,7 @@ func (this *ConfigMngrT) processSetAggIntfLagTypeFromChangelog(changelog *DiffCh
 	for {
 		// Repeat till there is not any change related to set aggregate interface LAG type
 		if change, exists := findSetAggIntfLagTypeChange(changelog); exists {
-			if err := this.validateSetAggIntfChange(change, changelog); err != nil {
+			if err := this.validateSetAggIntfLagTypeChange(change, changelog); err != nil {
 				return err
 			}
 		} else {
