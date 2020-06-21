@@ -297,12 +297,12 @@ func (this *ConfigMngrT) validateSetAggIntfChange(changeItem *DiffChangeMgmtT, c
 
 		lacpIntf := lacp.GetInterface(aggIfname)
 		if lacpIntf == nil {
-			return fmt.Errorf("Cannot find corresponding LACP configuration to aggregate interface %s in config", aggIfname)
+			return fmt.Errorf("Cannot find in config corresponding LACP to aggregate interface %s", aggIfname)
 		}
 
 		// Delegate to create aggregate interface to LACP config module
-		changeItem.MarkAsProcessed()
-		return nil
+		// changeItem.MarkAsProcessed()
+		// return nil
 	}
 
 	lagTypeChange, err := this.findAggIntfLagTypeFromChangelog(aggIfname, changelog)
@@ -310,7 +310,6 @@ func (this *ConfigMngrT) validateSetAggIntfChange(changeItem *DiffChangeMgmtT, c
 		return err
 	}
 
-	// Create static aggregate interface
 	setAggIntfCmd := cmd.NewSetAggIntfCmdT(changeItem.Change, lagTypeChange.Change, this.ethSwitchMgmtClient)
 	if err := this.transConfigLookupTbl.checkDependenciesForSetAggIntf(aggIfname); err != nil {
 		return fmt.Errorf("Cannot %q because there are dependencies from LAG interface %s:\n%s",
